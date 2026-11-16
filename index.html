@@ -1,0 +1,2451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Puppet">
+<meta name="theme-color" content="#0f1115">
+<title>Perspective Puppet — 3D reference for comics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0f1115; --panel:#16191f; --panel2:#1d2129; --line:#2a2f39; --text:#ebe7df; --mute:#8d939e;
+  --accent:#ffc53d; --accent2:#4da3ff; --red:#ff5a5f; --green:#2ecc71;
+  --r:10px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--ink);color:var(--text);font:14px/1.4 "Bricolage Grotesque",system-ui,sans-serif;overflow:hidden}
+button,input,select,textarea{font:inherit;color:inherit}
+#app{display:grid;grid-template-columns:330px 1fr;height:100vh;height:100dvh}
+#side{background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;display:flex;flex-direction:column}
+.brand{padding:16px 18px 12px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+.brand .logo{width:30px;height:30px;border-radius:7px;background:var(--accent);display:grid;place-items:center;color:#111;font-weight:800;font-size:15px;transform:rotate(-4deg);box-shadow:3px 3px 0 #000}
+.brand h1{font-size:17px;margin:0;font-weight:800;letter-spacing:-.01em}
+.brand small{display:block;color:var(--mute);font-size:11.5px;font-weight:400}
+.sec{padding:14px 18px;border-bottom:1px solid var(--line)}
+.sec h2{font-size:11px;text-transform:uppercase;letter-spacing:.12em;color:var(--mute);margin:0 0 10px;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+.searchbox{display:flex;gap:6px}
+.searchbox input{flex:1;min-width:0;background:var(--ink);border:1.5px solid var(--line);border-radius:var(--r);padding:10px 12px;outline:none}
+.searchbox input:focus{border-color:var(--accent)}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px 10px;cursor:pointer;white-space:nowrap;transition:background .12s,border-color .12s}
+.btn:hover{border-color:#454c59;background:#232833}
+.btn.primary{background:var(--accent);color:#141414;border-color:var(--accent);font-weight:700}
+.btn.primary:hover{background:#ffd264}
+.btn.danger:hover{border-color:var(--red);color:var(--red)}
+.btn.on{background:#2b2a1f;border-color:var(--accent);color:var(--accent)}
+.btn:disabled{opacity:.45;cursor:default}
+.seg{display:inline-flex;background:var(--ink);border:1px solid var(--line);border-radius:8px;padding:2px;gap:2px}
+.seg button{background:none;border:0;padding:4px 9px;border-radius:6px;cursor:pointer;color:var(--mute);font-size:12.5px}
+.seg button.on{background:var(--panel2);color:var(--text);box-shadow:inset 0 0 0 1px var(--line)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.row+.row{margin-top:8px}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}
+.chip{font-size:12px;padding:3px 9px;border-radius:99px;border:1px solid var(--line);background:none;cursor:pointer;color:#c9c5bd}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
+.status{margin-top:10px;font-size:12.5px;color:var(--mute);min-height:18px;display:flex;align-items:center;gap:8px}
+.status.err{color:var(--red)}
+.spin{width:13px;height:13px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;flex:none}
+@keyframes sp{to{transform:rotate(360deg)}}
+.badge{font-size:10.5px;padding:2px 7px;border-radius:99px;background:#22303f;color:#9fd0ff;text-transform:none;letter-spacing:0}
+.badge.lib{background:#3a2f1c;color:var(--accent)}
+.list{display:flex;flex-direction:column;gap:3px}
+.item{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;cursor:pointer;border:1px solid transparent}
+.item:hover{background:var(--panel2)}
+.item.sel{background:#232016;border-color:#4d4320}
+.item .ic{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;font-size:12px;background:var(--panel2);flex:none}
+.item .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item .x{opacity:.0;background:none;border:0;cursor:pointer;color:var(--mute);padding:2px 5px}
+.item:hover .x{opacity:1}
+.item .x:hover{color:var(--text)}
+.empty{color:var(--mute);font-size:12.5px}
+.slider{display:grid;grid-template-columns:96px 1fr 46px;gap:8px;align-items:center;margin:5px 0;font-size:12.5px}
+.slider label{color:#bdb9b1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slider output{font-family:"IBM Plex Mono",monospace;font-size:11.5px;text-align:right;color:var(--mute)}
+input[type=range]{width:100%;accent-color:var(--accent);height:18px}
+select{background:var(--ink);border:1px solid var(--line);border-radius:7px;padding:5px 8px;max-width:100%}
+textarea{width:100%;background:var(--ink);border:1.5px solid var(--line);border-radius:var(--r);padding:8px 10px;resize:vertical;min-height:54px;outline:none}
+textarea:focus{border-color:var(--accent)}
+.grid-btns{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
+.grid-btns .btn{padding:6px 4px;font-size:12.5px}
+.sub{font-size:12px;color:var(--mute);margin:10px 0 4px}
+.hint{font-size:12px;color:var(--mute);margin-top:6px}
+.kbd{font-family:"IBM Plex Mono",monospace;font-size:11px;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 4px;color:#bdb9b1}
+
+#stage{position:relative;overflow:hidden;background:#e9e6df}
+#gl,#ov{position:absolute;inset:0;width:100%;height:100%;display:block}
+#ov{pointer-events:none}
+.views{position:absolute;top:12px;left:12px;display:flex;gap:4px;flex-wrap:wrap;max-width:calc(100% - 300px)}
+.views .btn,.bar .btn{background:rgba(22,25,31,.88);backdrop-filter:blur(6px);font-size:12.5px;padding:6px 10px}
+.views .btn:hover,.bar .btn:hover{background:rgba(35,40,51,.95)}
+.bar{position:absolute;bottom:12px;left:12px;right:12px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;pointer-events:none}
+.bar>*{pointer-events:auto}
+.bar .grow{flex:1;pointer-events:none}
+.hud{font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:#2a2c31;background:rgba(255,255,255,.7);padding:4px 9px;border-radius:7px;pointer-events:none}
+.dark .hud{color:#d9d6cf;background:rgba(0,0,0,.45)}
+#cam{position:absolute;top:12px;right:12px;width:268px;background:rgba(22,25,31,.94);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:12px;max-height:calc(100% - 70px);overflow-y:auto}
+#cam summary{list-style:none;cursor:pointer;padding:10px 14px;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+#cam summary::-webkit-details-marker{display:none}
+#cam summary::after{content:"▾";color:var(--mute)}
+#cam:not([open]) summary::after{content:"▸"}
+#cam .in{padding:0 14px 14px}
+#cam .slider{grid-template-columns:78px 1fr 46px}
+.check{display:flex;align-items:center;gap:7px;font-size:12.5px;color:#bdb9b1;cursor:pointer}
+.check input{accent-color:var(--accent)}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;place-items:center;z-index:50}
+.modal.show{display:grid}
+.modal .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;max-width:min(90vw,900px);max-height:90vh;overflow:auto}
+.modal img{max-width:100%;max-height:70vh;display:block;border-radius:6px;background:#fff}
+#toggleSide{display:none}
+#home{position:fixed;inset:0;z-index:40;display:none;overflow:auto;background:radial-gradient(1200px 600px at 20% -10%,#2a2516 0,transparent 60%),var(--ink)}
+#home.show{display:block}
+#home::before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.05;background-image:linear-gradient(#fff 1px,transparent 1px),linear-gradient(90deg,#fff 1px,transparent 1px);background-size:44px 44px}
+.homewrap{position:relative;max-width:1060px;margin:0 auto;padding:calc(44px + env(safe-area-inset-top)) 28px calc(30px + env(safe-area-inset-bottom))}
+.homehead{display:flex;gap:18px;align-items:center;margin-bottom:22px}
+.logo.big{width:58px;height:58px;border-radius:13px;font-size:30px;flex:none;background:var(--accent);display:grid;place-items:center;color:#111;font-weight:800;transform:rotate(-4deg);box-shadow:5px 5px 0 #000}
+.homehead h1{font-size:34px;margin:0;font-weight:800;letter-spacing:-.02em}
+.homehead p{margin:4px 0 0;color:var(--mute);max-width:560px}
+.homegrid{display:grid;grid-template-columns:1.05fr 1fr;gap:22px;margin-top:16px}
+.homegrid section{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px}
+.homegrid h2{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--mute);margin:0 0 12px;font-weight:600}
+#homeName{width:100%;background:var(--ink);border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;outline:none;margin-bottom:12px}
+#homeName:focus{border-color:var(--accent)}
+.tpls{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.tpl{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:14px 10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;transition:transform .12s,border-color .12s}
+.tpl:hover{border-color:var(--accent);transform:translateY(-2px)}
+.tpl .ti{font-size:28px}
+.tpl b{font-size:13.5px}
+.tpl small{color:var(--mute);font-size:11.5px;line-height:1.25}
+.contcard{width:100%;display:flex;align-items:center;gap:14px;background:#232016;border:1.5px solid #5a4b1f;border-radius:14px;padding:14px 16px;cursor:pointer;color:var(--text)}
+.contcard:hover{border-color:var(--accent)}
+.contcard .ci{width:42px;height:42px;border-radius:50%;background:var(--accent);color:#111;display:grid;place-items:center;font-size:16px;flex:none}
+.contcard b{display:block;font-size:15px}
+.contcard small{color:var(--mute)}
+.hscenes{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:9px;max-height:420px;overflow:auto}
+.hscene{background:var(--panel2);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.hscene img,.hscene .ph{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;background:#e9e6df}
+.hscene .ph{display:grid;place-items:center;font-size:30px;background:#20242c}
+.hscene .b{padding:7px 8px}
+.hscene .nm{font-weight:600;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hscene .acts{display:flex;gap:4px;margin-top:6px}
+.hscene .acts .btn{padding:3px 8px;font-size:12px}
+.homeconfirm{background:#2a1e1e;border:1px solid #6b3434;border-radius:12px;padding:12px 14px;margin-bottom:12px}
+.homefoot{margin-top:18px}
+@media (max-width:820px){.homegrid{grid-template-columns:1fr}.tpls{grid-template-columns:repeat(2,1fr)}.homehead h1{font-size:26px}}
+
+.brand .btn{padding:5px 8px;font-size:12px}
+.brand .pill{margin-left:2px}
+.pill{font-size:10.5px;padding:1px 7px;border-radius:99px;background:#3a2f1c;color:var(--accent);white-space:nowrap}
+.pill.ok{background:#1c3a2a;color:#7fe0a6}
+.libcard{width:min(940px,95vw);height:min(700px,90vh);display:flex;flex-direction:column}
+.libbody{flex:1;overflow:auto;margin-top:12px;padding-right:2px}
+.libgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(176px,1fr));gap:10px}
+.lcard{background:var(--panel2);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
+.lcard img{width:100%;aspect-ratio:4/3;object-fit:cover;background:#e9e6df;display:block}
+.lcard .ph{aspect-ratio:4/3;display:grid;place-items:center;font-size:34px;background:#20242c}
+.lcard .b{padding:8px}
+.lcard .nm{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dt{font-size:11px;color:var(--mute)}
+.lcard .acts{display:flex;flex-wrap:wrap;gap:4px;margin-top:7px}
+.lcard .acts .btn{padding:3px 8px;font-size:12px}
+.urow{display:flex;align-items:center;gap:8px;padding:7px 9px;border:1px solid var(--line);border-radius:10px;margin-bottom:6px;background:var(--panel2);flex-wrap:wrap}
+.urow img{width:56px;height:42px;object-fit:cover;border-radius:6px;background:#e9e6df}
+.urow .ic2{width:42px;height:42px;display:grid;place-items:center;font-size:20px;background:var(--ink);border-radius:8px}
+.urow .nm2{font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.urow .btn{padding:4px 8px;font-size:12px}
+.aibox{margin-top:10px;border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--ink)}
+.aibox summary{cursor:pointer;font-size:12.5px;color:#bdb9b1}
+.aibox summary b{color:var(--text)}
+.aibox .fld{display:grid;grid-template-columns:70px 1fr;gap:6px;align-items:center;margin-top:7px;font-size:12.5px;color:#bdb9b1}
+.aibox .fld input{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:5px 7px;min-width:0;outline:none}
+.aibox .fld input:focus{border-color:var(--accent)}
+.aibox code{font-family:"IBM Plex Mono",monospace;font-size:11px;background:var(--panel2);padding:1px 4px;border-radius:4px;color:#e9e6df}
+.aibox ol{margin:4px 0 0;padding-left:18px}
+.refzone{margin-top:10px;border:1.5px dashed var(--line);border-radius:10px;padding:8px;transition:border-color .12s,background .12s}
+.refzone.drag,body.dragging .refzone{border-color:var(--accent);background:#221f14}
+.tray{display:flex;flex-wrap:wrap;gap:6px}
+.tray:not(:empty){margin-top:8px}
+.thumb{position:relative;width:60px;height:60px;border-radius:7px;overflow:hidden;border:1px solid var(--line);background:#0b0c0f;flex:none}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb.note{display:grid;place-items:center;font-size:10.5px;color:#cfcac1;padding:4px;text-align:center;word-break:break-all;line-height:1.15}
+.thumb .role{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.72);color:var(--accent);font-size:10px;text-align:center;padding:1px 0;font-weight:600;cursor:pointer}
+.thumb .role.skip{color:var(--mute)}
+.thumb button{position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;border:0;background:rgba(0,0,0,.7);color:#fff;font-size:11px;line-height:18px;padding:0;cursor:pointer}
+body.dragging #stage::after{content:"Drop images, a PDF, notes or a 3D file";position:absolute;inset:10px;border:3px dashed var(--accent);border-radius:14px;display:grid;place-items:center;font-weight:800;font-size:20px;color:#111;background:rgba(255,197,61,.18);pointer-events:none}
+/* ---------- phone layout (body.mobile) ---------- */
+#mtop,#mtabs,#secCam{display:none}
+body.mobile{font-size:15px}
+body.mobile #app{display:block;height:100dvh}
+body.mobile #mtop{display:flex;position:fixed;top:0;left:0;right:0;height:calc(50px + env(safe-area-inset-top));padding-top:env(safe-area-inset-top)!important;z-index:22;align-items:center;gap:8px;padding:0 8px;background:var(--panel);border-bottom:1px solid var(--line)}
+body.mobile #mtop .btn{min-width:42px;height:38px;font-size:16px;padding:0 10px}
+body.mobile #mtop .mtitle{flex:1;min-width:0;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}
+body.mobile #mtabs{display:flex;position:fixed;left:0;right:0;bottom:0;height:calc(60px + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom);z-index:22;background:var(--panel);border-top:1px solid var(--line)}
+body.mobile #mtabs button{flex:1;background:none;border:0;color:var(--mute);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-size:11px;position:relative;cursor:pointer}
+body.mobile #mtabs button span{font-size:20px;line-height:1}
+body.mobile #mtabs button.on{color:var(--accent)}
+body.mobile #mtabs button.on::before{content:"";position:absolute;top:0;left:22%;right:22%;height:3px;border-radius:0 0 3px 3px;background:var(--accent)}
+body.mobile #mtabs button.dot::after{content:"";position:absolute;top:9px;right:calc(50% - 16px);width:8px;height:8px;border-radius:50%;background:var(--accent)}
+body.mobile #stage{position:fixed;left:0;right:0;top:calc(50px + env(safe-area-inset-top));bottom:calc(60px + env(safe-area-inset-bottom));transition:bottom .22s}
+body.mobile.sheet-open #stage{bottom:calc(60px + env(safe-area-inset-bottom) + 50dvh)}
+body.mobile #side{position:fixed;left:0;right:0;bottom:calc(60px + env(safe-area-inset-bottom));height:50dvh;max-height:none;z-index:21;border:0;border-top:1px solid var(--line);border-radius:16px 16px 0 0;transform:translateY(calc(100% + 70px));transition:transform .22s;box-shadow:0 -10px 30px rgba(0,0,0,.35);overscroll-behavior:contain}
+body.mobile.sheet-open #side{transform:none}
+body.mobile #side::before{content:"";display:block;width:42px;height:5px;border-radius:3px;background:#3a404c;margin:8px auto 0}
+body.mobile #side .brand,body.mobile #side .sec.hint{display:none}
+body.mobile #side .sec{display:none;border:0;padding:10px 14px 18px}
+body.mobile #side .sec.mshow{display:block}
+body.mobile #cam,body.mobile #toggleSide,body.mobile .hud,body.mobile #snapBtn,body.mobile #glbBtn,body.mobile .bar .grow{display:none!important}
+body.mobile .views{top:8px;left:8px;right:8px;max-width:none;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+body.mobile .views::-webkit-scrollbar{display:none}
+body.mobile .views .btn{flex:none;padding:8px 12px;font-size:13px}
+body.mobile .bar{bottom:8px;left:8px;right:8px;justify-content:center}
+body.mobile #modeSeg button{padding:9px 14px;font-size:14px}
+body.mobile .btn{padding:9px 12px;min-height:38px}
+body.mobile .seg button{padding:8px 11px;font-size:13.5px}
+body.mobile .chip{padding:6px 12px;font-size:13px}
+body.mobile input,body.mobile textarea,body.mobile select{font-size:16px}
+body.mobile .slider{grid-template-columns:92px 1fr 50px;margin:9px 0}
+body.mobile input[type=range]{height:30px}
+body.mobile .grid-btns .btn{padding:9px 4px;font-size:13px}
+body.mobile .item{padding:10px 8px}
+body.mobile .item .x{opacity:1;font-size:16px;padding:4px 8px}
+body.mobile .thumb{width:70px;height:70px}
+body.mobile .thumb button{width:24px;height:24px;line-height:24px;font-size:13px}
+body.mobile .thumb .role{font-size:11.5px;padding:3px 0}
+body.mobile .modal{align-items:stretch}
+body.mobile .modal .card{max-width:100vw;max-height:100dvh;border-radius:0}
+body.mobile .libcard{width:100vw;height:100dvh}
+body.mobile .libgrid{grid-template-columns:repeat(2,1fr)}
+body.mobile #libTabs{overflow-x:auto;flex-wrap:nowrap!important;max-width:100%}
+body.mobile #libTabs button{flex:none}
+body.mobile .homewrap{padding:calc(24px + env(safe-area-inset-top)) 14px calc(30px + env(safe-area-inset-bottom))}
+body.mobile .homehead{gap:12px}
+body.mobile .logo.big{width:46px;height:46px;font-size:24px}
+body.mobile .homehead h1{font-size:24px}
+body.mobile .homegrid{grid-template-columns:1fr;gap:14px}
+body.mobile .tpls{grid-template-columns:repeat(2,1fr)}
+body.mobile .hscenes{grid-template-columns:repeat(2,1fr);max-height:none}
+body.mobile .homefoot .btn{flex:1 1 45%}
+body.mobile #homeWhere{margin:6px 0 0!important;width:100%}
+body.mobile.dragging #stage::after{font-size:16px}
+
+</style>
+<script>window.PP_STANDALONE = true; window.PP_WEBAPP = true;</script>
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+}}
+</script>
+</head>
+<body>
+<div id="mtop"><button class="btn" data-m="menu" aria-label="Menu">☰</button><div class="mtitle" id="mTitle">Untitled scene</div><button class="btn" data-m="lib" id="mLib" aria-label="Library">📚</button></div>
+<nav id="mtabs"><button data-t="build"><span>➕</span>Build</button><button data-t="scene"><span>🎬</span>Scene</button><button data-t="edit" id="mtabEdit"><span>✏️</span>Edit</button><button data-t="cam"><span>🎥</span>Camera</button><button data-t="snap"><span>📷</span>Snap</button></nav>
+<div id="app">
+  <aside id="side">
+    <div class="brand">
+      <div class="logo">P</div>
+      <div style="flex:1"><h1>Perspective Puppet</h1><small>3D reference for drawing comics</small></div>
+      <button class="btn" id="menuBtn" type="button" title="Start menu: new scene, open a saved one">☰ Menu</button>
+      <button class="btn" id="libBtn" type="button" title="Saved scenes, poses, objects and references (L)">📚 Library</button>
+      <button class="btn" id="pcBtn" type="button" title="Download a version that runs in your browser on Windows, Mac or Linux, and can use free AI">💻 PC version</button>
+    </div>
+
+    <div class="sec" id="secBuild">
+      <h2>Search &amp; build <span id="aiBadge" class="badge">connecting…</span></h2>
+      <form id="searchForm" class="searchbox">
+        <input id="q" placeholder="e.g. samurai, vintage car, office chair" autocomplete="off">
+        <button class="btn primary" id="goBtn" type="submit">Build</button>
+      </form>
+      <div class="row" style="margin-top:9px">
+        <div class="seg" id="kindSeg"><button data-v="auto" class="on">Auto</button><button data-v="character">Character</button><button data-v="prop">Prop</button></div>
+        <div class="seg" id="qualSeg" title="Detailed takes longer but gives better shapes"><button data-v="default" class="on">Fast</button><button data-v="complex">Detailed</button></div>
+      </div>
+      <details id="aiBox" class="aibox">
+        <summary>AI engine: <b id="aiName">…</b></summary>
+        <select id="aiProv" style="width:100%;margin-top:8px"></select>
+        <div id="aiFields"></div>
+        <div class="row" style="margin-top:8px"><button class="btn" id="aiTest" type="button">Test connection</button><span id="aiTestOut" class="hint" style="margin:0"></span></div>
+        <div class="hint" id="aiHelp"></div>
+      </details>
+      <div id="refZone" class="refzone">
+        <div class="row" style="justify-content:space-between">
+          <button class="btn" type="button" id="refBtn">📎 Add reference</button>
+          <label class="check" title="When the reference shows a person, pose the mannequin like them"><input type="checkbox" id="copyPose" checked> Copy pose</label>
+        </div>
+        <input type="file" id="refFile" multiple hidden accept="image/*,.pdf,.txt,.md,.json,.csv,.glb,.gltf,.obj,.stl,.fbx,.ply">
+        <div class="tray" id="tray"></div>
+        <div id="refOpts" style="display:none;margin-top:8px">
+          <div class="seg" id="refMode"><button type="button" data-v="ai" class="on">AI model</button><button type="button" data-v="shape">Shape from image (no AI)</button></div>
+          <div class="row" id="shapeOpts" style="margin-top:7px;display:none">
+            <label class="check">Real height <input type="number" id="shapeH" min="0.05" max="200" step="0.05" placeholder="auto" style="width:64px;background:var(--ink);border:1px solid var(--line);border-radius:6px;padding:3px 6px"> m</label>
+            <label class="check" title="How aggressively the background is removed">Cutout <input type="range" id="shapeTol" min="10" max="120" value="48" style="width:70px"></label>
+          </div>
+          <div class="hint" id="shapeHint" style="display:none">Click a thumbnail to set what it shows: <b>Front</b>, <b>Side ←</b> (facing left), <b>Side →</b> (facing right), <b>Back</b> or <b>Skip</b>. A front view alone gives a rounded cut-out; add a side view and it carves a full 3D shape. Works best on a plain background.</div>
+        </div>
+        <div class="hint" id="refHint">Drop, paste or pick photos, sketches, turnarounds, a PDF or notes, and the model is built to match them. You can leave the search box empty. 3D files (.glb .obj .stl .fbx .ply) load straight into the scene.</div>
+      </div>
+      <div class="chips" id="chips"></div>
+      <div class="status" id="status"></div>
+      <div class="chips" id="recent"></div>
+    </div>
+
+    <div class="sec" id="secScene">
+      <h2><span>Scene · <span id="sceneTitle" title="Click to rename" style="cursor:text;color:var(--text);text-transform:none;letter-spacing:0;font-size:12.5px">Untitled scene</span></span><span><button class="btn" id="addMan" style="padding:3px 8px;font-size:12px">+ Mannequin</button></span></h2>
+      <div class="list" id="list"></div>
+    </div>
+
+    <div class="sec" id="inspector"></div>
+    <div class="sec" id="secCam"><h2>Camera &amp; guides</h2><div id="mCamExtra" class="row" style="margin-top:12px"><button class="btn" id="mSnap" type="button">📷 Snapshot PNG</button><button class="btn" id="mGlb" type="button">⬇ Export .glb</button></div></div>
+    <div class="sec hint" style="border:0">
+      <span class="kbd">Q</span> pose · <span class="kbd">W</span> move · <span class="kbd">E</span> rotate · <span class="kbd">R</span> scale · <span class="kbd">F</span> frame · <span class="kbd">Del</span> delete<br>
+      Drag to orbit · right-drag to pan · scroll to zoom. Your scene is saved in this browser.
+    </div>
+  </aside>
+
+  <main id="stage">
+    <canvas id="gl"></canvas><canvas id="ov"></canvas>
+    <div class="views" id="views">
+      <button class="btn" id="toggleSide">☰</button>
+      <button class="btn" data-view="front">Front</button>
+      <button class="btn" data-view="threeq">¾</button>
+      <button class="btn" data-view="side">Side</button>
+      <button class="btn" data-view="back">Back</button>
+      <button class="btn" data-view="eye">Eye level</button>
+      <button class="btn" data-view="bird">Bird's-eye</button>
+      <button class="btn" data-view="worm">Worm's-eye</button>
+      <button class="btn" data-view="top">Top</button>
+    </div>
+
+    <details id="cam" open>
+      <summary>Camera &amp; guides</summary>
+      <div class="in" id="camIn">
+        <div class="slider"><label>Lens</label><input type="range" id="focal" min="12" max="200" step="1" value="35"><output id="focalO">35mm</output></div>
+        <label class="check" style="margin:-2px 0 6px"><input type="checkbox" id="dolly"> Dolly zoom (keep subject size)</label>
+        <div class="grid-btns" style="grid-template-columns:repeat(5,1fr);margin-bottom:6px">
+          <button class="btn" data-lens="14">14</button><button class="btn" data-lens="24">24</button><button class="btn" data-lens="35">35</button><button class="btn" data-lens="50">50</button><button class="btn" data-lens="100">100</button>
+        </div>
+        <div class="slider"><label>Dutch tilt</label><input type="range" id="roll" min="-45" max="45" step="1" value="0"><output id="rollO">0°</output></div>
+        <div class="sub">Perspective guides</div>
+        <div class="seg" id="guideSeg"><button data-v="off">Off</button><button data-v="horizon">Horizon</button><button data-v="2pt" class="on">2-pt</button><button data-v="3pt">3-pt</button></div>
+        <div class="row" style="margin-top:8px">
+          <label class="check"><input type="checkbox" id="gridT" checked> Floor grid</label>
+          <label class="check"><input type="checkbox" id="headT" checked> Head lines</label>
+          <label class="check"><input type="checkbox" id="shadowT" checked> Shadows</label>
+        </div>
+        <div class="sub">Panel frame</div>
+        <select id="aspect">
+          <option value="0">Full view</option><option value="1.7778">16:9 wide</option><option value="1.3333">4:3</option><option value="1">1:1 square</option><option value="0.75">3:4 tall</option><option value="0.6667">2:3 tall</option><option value="0.5">1:2 tall strip</option><option value="2.3333">21:9 cinematic</option><option value="3">3:1 wide strip</option>
+        </select>
+        <div class="sub">Render style</div>
+        <select id="style">
+          <option value="color">Color</option><option value="comic">Comic (toon + ink)</option><option value="clay">Clay grey</option><option value="ink">Ink lines</option><option value="wire">Wireframe</option><option value="silhouette">Silhouette</option>
+        </select>
+        <select id="bg" style="margin-left:4px">
+          <option value="#e9e6df">Paper</option><option value="#ffffff">White</option><option value="#9aa3ad">Mid grey</option><option value="#1b1e24">Dark</option>
+        </select>
+        <div class="sub">Light</div>
+        <div class="slider"><label>Direction</label><input type="range" id="laz" min="-180" max="180" value="40"><output id="lazO">40°</output></div>
+        <div class="slider"><label>Height</label><input type="range" id="lel" min="5" max="90" value="50"><output id="lelO">50°</output></div>
+      </div>
+    </details>
+
+    <div class="bar">
+      <div class="seg" id="modeSeg"><button data-v="pose" class="on" title="Q">Pose</button><button data-v="translate" title="W">Move</button><button data-v="rotate" title="E">Rotate</button><button data-v="scale" title="R">Scale</button></div>
+      <span class="hud" id="hud"></span>
+      <span class="grow"></span>
+      <button class="btn" id="snapBtn">📷 Snapshot PNG</button>
+      <button class="btn" id="glbBtn">⬇ Export .glb</button>
+    </div>
+  </main>
+</div>
+
+<div id="home">
+  <div class="homewrap">
+    <div class="homehead">
+      <div class="logo big">P</div>
+      <div><h1>Perspective Puppet</h1><p>Build 3D references for your comic panels: pose figures, set up props and find the perfect camera angle.</p></div>
+    </div>
+    <div id="homeConfirm" class="homeconfirm" style="display:none"></div>
+    <div id="homeCont"></div>
+    <div class="homegrid">
+      <section>
+        <h2>New scene</h2>
+        <input id="homeName" placeholder="Scene name (optional), e.g. Chapter 3, page 12" autocomplete="off">
+        <div id="homeTpl" class="tpls"></div>
+      </section>
+      <section>
+        <h2>Your saved scenes</h2>
+        <div id="homeScenes" class="hscenes"></div>
+      </section>
+    </div>
+    <div class="row homefoot">
+      <button class="btn" id="homeOpenFile" type="button">⬆ Open a file…</button>
+      <button class="btn" id="homeLib" type="button">📚 Library</button>
+      <button class="btn" id="homePC" type="button">💻 Get the PC version</button>
+      <button class="btn" id="homeLayout" type="button" title="Switch between the phone and desktop layouts">Layout: Auto</button>
+      <span class="hint" id="homeWhere" style="margin:0 0 0 auto"></span>
+    </div>
+  </div>
+</div>
+<div class="modal" id="libModal"><div class="card libcard">
+  <div class="row" style="justify-content:space-between;flex-wrap:nowrap"><h2 style="margin:0;font-size:19px;font-weight:800">📚 Library</h2><button class="btn" id="libClose">Close</button></div>
+  <div class="hint" id="libWhere" style="margin-top:2px"></div>
+  <div class="row" style="margin-top:10px"><button class="btn primary" id="libSaveScene">💾 Save scene</button><button class="btn" id="libSaveAll">Save everything unsaved</button><button class="btn" id="libImport" title="Open .json files saved from this app, backups, 3D models or images">⬆ Open file</button><button class="btn" id="libBackup" title="Download your whole library as one file">⬇ Back up all</button>
+    <input type="file" id="libFile" hidden multiple accept=".json,.glb,.gltf,.obj,.stl,.fbx,.ply,image/*,.pdf,.txt,.md"></div>
+  <div class="seg" id="libTabs" style="margin-top:12px;flex-wrap:wrap"></div>
+  <div id="libBody" class="libbody"></div>
+</div></div>
+<div class="modal" id="modal"><div class="card"><div id="modalBody"></div><div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn" id="modalClose">Close</button></div></div></div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { TransformControls } from 'three/addons/controls/TransformControls.js';
+import { OutlineEffect } from 'three/addons/effects/OutlineEffect.js';
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+
+const $ = s => document.querySelector(s);
+const D2R = Math.PI / 180, V = THREE.Vector3;
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const num = (v, d = 0) => (typeof v === 'number' && isFinite(v)) ? v : (isFinite(+v) && v !== '' && v != null ? +v : d);
+
+/* ================= renderer / scene ================= */
+const stage = $('#stage'), glc = $('#gl'), ovc = $('#ov'), ov = ovc.getContext('2d');
+const renderer = new THREE.WebGLRenderer({ canvas: glc, antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+const outline = new OutlineEffect(renderer, { defaultThickness: 0.0042, defaultColor: [0.06, 0.06, 0.08] });
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#e9e6df');
+const camera = new THREE.PerspectiveCamera(50, 1, 0.02, 800);
+camera.filmGauge = 35; camera.setFocalLength(35);
+camera.position.set(2.4, 1.5, 3.4);
+const controls = new OrbitControls(camera, glc);
+controls.target.set(0, 0.9, 0); controls.enableDamping = true; controls.dampingFactor = 0.12;
+controls.maxPolarAngle = Math.PI * 0.985; controls.minDistance = 0.05; controls.maxDistance = 400;
+
+const hemi = new THREE.HemisphereLight(0xffffff, 0x8a8170, 0.95); scene.add(hemi);
+const key = new THREE.DirectionalLight(0xffffff, 2.3);
+key.castShadow = true; key.shadow.mapSize.set(2048, 2048);
+Object.assign(key.shadow.camera, { left: -9, right: 9, top: 9, bottom: -9, near: 0.5, far: 80 });
+key.shadow.bias = -0.0004; key.shadow.normalBias = 0.02;
+scene.add(key, key.target);
+const noOutline = m => { m.userData.outlineParameters = { visible: false }; return m; };
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), noOutline(new THREE.ShadowMaterial({ opacity: 0.22 })));
+ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+const grid = new THREE.GridHelper(60, 60, 0x000000, 0x000000);
+grid.material.transparent = true; grid.material.opacity = 0.13; noOutline(grid.material); scene.add(grid);
+const world = new THREE.Group(); scene.add(world);
+
+const tc = new TransformControls(camera, glc);
+tc.setSize(0.85); scene.add(tc);
+tc.traverse(o => { if (o.material) noOutline(o.material); });
+
+/* ================= primitives ================= */
+const geoCache = new Map();
+function cachedGeo(key, make) { if (!geoCache.has(key)) geoCache.set(key, make()); return geoCache.get(key); }
+function wedgeGeo() {
+  const g = new THREE.BoxGeometry(1, 1, 1), p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) if (p.getY(i) > 0 && p.getZ(i) > 0) p.setY(i, -0.5);
+  g.computeVertexNormals(); return g;
+}
+const PLACE = new THREE.MeshBasicMaterial();
+function normColor(c, d = '#9a9a9a') { try { return '#' + new THREE.Color(c || d).getHexString(); } catch { return d; } }
+function makePart(p, extra = {}) {
+  let s = Array.isArray(p.size) ? p.size.map(v => Math.max(Math.abs(num(v, 0.1)), 0.002)) : [0.1, 0.1, 0.1];
+  while (s.length < 3) s.push(s[s.length - 1] || 0.1);
+  const shape = String(p.shape || 'box').toLowerCase();
+  let g, sc = [s[0], s[1], s[2]];
+  if (shape === 'capsule') {
+    const r = Math.min(s[0], s[2]) / 2, len = Math.max(s[1] - 2 * r, 0.0001);
+    g = cachedGeo(`cap${r.toFixed(4)}_${len.toFixed(4)}`, () => new THREE.CapsuleGeometry(r, len, 6, 18));
+    sc = [s[0] / (2 * r), 1, s[2] / (2 * r)];
+  } else if (shape === 'torus') {
+    const tube = Math.min(s[2] / 2, s[0] / 4), R = Math.max(s[0] / 2 - tube, 0.001);
+    const arc = p.arc ? clamp(num(p.arc, 360), 5, 360) * D2R : Math.PI * 2;
+    g = new THREE.TorusGeometry(R, tube, 12, 44, arc); sc = [1, s[1] / s[0], 1];
+  } else if (shape === 'hemisphere') {
+    g = cachedGeo('hemi', () => new THREE.SphereGeometry(0.5, 30, 12, 0, Math.PI * 2, 0, Math.PI / 2)); sc = [s[0], s[1] * 2, s[2]];
+  } else if (shape === 'sphere' || shape === 'ellipsoid') {
+    g = cachedGeo('sph', () => new THREE.SphereGeometry(0.5, 30, 20));
+  } else if (shape === 'cylinder' || shape === 'tube') {
+    const t = clamp(num(p.taper, 1), 0, 4).toFixed(3);
+    g = cachedGeo('cyl' + t, () => new THREE.CylinderGeometry(0.5 * +t, 0.5, 1, 30));
+  } else if (shape === 'cone') {
+    g = cachedGeo('cone', () => new THREE.ConeGeometry(0.5, 1, 30));
+  } else if (shape === 'pyramid') {
+    g = cachedGeo('pyr', () => { const q = new THREE.ConeGeometry(0.5 * Math.SQRT2, 1, 4); q.rotateY(Math.PI / 4); return q; });
+  } else if (shape === 'wedge' || shape === 'ramp') {
+    g = cachedGeo('wedge', wedgeGeo);
+  } else {
+    g = cachedGeo('box', () => new THREE.BoxGeometry(1, 1, 1));
+  }
+  const m = new THREE.Mesh(g, PLACE);
+  m.scale.set(...sc);
+  const pos = Array.isArray(p.pos) ? p.pos : [0, 0, 0];
+  m.position.set(num(pos[0]), num(pos[1]), num(pos[2]));
+  const r = Array.isArray(p.rot) ? p.rot : [0, 0, 0];
+  m.rotation.set(num(r[0]) * D2R, num(r[1]) * D2R, num(r[2]) * D2R);
+  m.castShadow = m.receiveShadow = true;
+  const op = p.opacity != null ? clamp(num(p.opacity, 1), 0.1, 1) : 1;
+  m.userData = { styleable: true, color: normColor(p.color), metal: !!p.metal, opacity: op, label: p.name || '', ...extra };
+  return m;
+}
+
+/* ================= materials / styles ================= */
+let style = 'color';
+const toonGrad = (() => { const t = new THREE.DataTexture(new Uint8Array([70, 160, 255]), 3, 1, THREE.RedFormat); t.minFilter = t.magFilter = THREE.NearestFilter; t.needsUpdate = true; return t; })();
+const matCache = new Map();
+function getMat(ud) {
+  const hl = !!ud.hl;
+  const k = [style, ud.color, ud.metal ? 1 : 0, ud.opacity, hl ? 1 : 0, ud.joint ? 1 : 0].join('|');
+  if (matCache.has(k)) return matCache.get(k);
+  let m; const c = new THREE.Color(ud.color);
+  switch (style) {
+    case 'clay': m = new THREE.MeshStandardMaterial({ color: ud.joint ? 0xb3ab9f : 0xcfc9bf, roughness: 0.92 }); break;
+    case 'comic': m = new THREE.MeshToonMaterial({ color: c, gradientMap: toonGrad, transparent: ud.opacity < 1, opacity: ud.opacity }); break;
+    case 'ink': m = new THREE.MeshToonMaterial({ color: ud.joint ? 0xe6e2da : 0xf7f5f0, gradientMap: toonGrad }); break;
+    case 'wire': m = new THREE.MeshBasicMaterial({ color: 0x2b2f38, wireframe: true }); break;
+    case 'silhouette': m = new THREE.MeshBasicMaterial({ color: 0x15161a }); break;
+    default: m = new THREE.MeshStandardMaterial({ color: c, roughness: ud.metal ? 0.32 : 0.78, metalness: ud.metal ? 0.65 : 0.02, transparent: ud.opacity < 1, opacity: ud.opacity });
+  }
+  if (hl) {
+    if (m.emissive) { m.emissive.set(0xff9d00); m.emissiveIntensity = 0.55; }
+    else m.color.set(style === 'silhouette' ? 0xff9d00 : 0xe08a00);
+  }
+  matCache.set(k, m); return m;
+}
+const origMat = new WeakMap(); // imported 3D files keep their own materials in Color style
+function applyStyleTo(root) {
+  root.traverse(o => {
+    if (o.isMesh && o.userData.styleable)
+      o.material = (style === 'color' && !o.userData.hl && origMat.has(o.geometry)) ? origMat.get(o.geometry) : getMat(o.userData);
+  });
+}
+function setStyle(s) {
+  style = s;
+  const dark = ['ink', 'silhouette'].includes(s);
+  scene.background.set(dark ? '#ffffff' : $('#bg').value);
+  stage.classList.toggle('dark', !dark && $('#bg').value === '#1b1e24');
+  ground.material.opacity = s === 'silhouette' ? 0 : (s === 'ink' ? 0.12 : 0.22);
+  applyStyleTo(world);
+}
+
+/* ================= character rig ================= */
+const BONES = ['hips', 'spine', 'chest', 'neck', 'head', 'upperarm_l', 'forearm_l', 'hand_l', 'upperarm_r', 'forearm_r', 'hand_r', 'thigh_l', 'shin_l', 'foot_l', 'thigh_r', 'shin_r', 'foot_r'];
+const TORSO = new Set(['hips', 'spine', 'chest', 'neck', 'head']);
+const NICE = { hips: 'Hips (whole body)', spine: 'Waist', chest: 'Chest', neck: 'Neck', head: 'Head', upperarm_l: 'L shoulder', forearm_l: 'L elbow', hand_l: 'L wrist', upperarm_r: 'R shoulder', forearm_r: 'R elbow', hand_r: 'R wrist', thigh_l: 'L hip', shin_l: 'L knee', foot_l: 'L ankle', thigh_r: 'R hip', shin_r: 'R knee', foot_r: 'R ankle' };
+function signs(b) {
+  if (TORSO.has(b)) return [1, 1, -1];
+  const side = b.endsWith('_l') ? 1 : -1, base = b.slice(0, -2);
+  if (['upperarm', 'forearm', 'hand', 'thigh'].includes(base)) return [-1, side, side];
+  return [1, side, side];
+}
+function axesFor(b) {
+  if (TORSO.has(b)) return [['x', 'Bend fwd/back'], ['y', 'Twist'], ['z', 'Lean side']];
+  const base = b.slice(0, -2);
+  if (base === 'upperarm') return [['x', 'Swing fwd/back'], ['z', 'Raise out/in'], ['y', 'Twist']];
+  if (base === 'thigh') return [['x', 'Swing fwd/back'], ['z', 'Spread out/in'], ['y', 'Twist']];
+  if (base === 'forearm') return [['x', 'Elbow bend'], ['y', 'Twist']];
+  if (base === 'shin') return [['x', 'Knee bend']];
+  if (base === 'hand') return [['x', 'Wrist curl'], ['z', 'Wrist tilt'], ['y', 'Twist']];
+  return [['x', 'Point toes'], ['z', 'Roll'], ['y', 'Twist']];
+}
+const BODY_DEFAULT = { height: 1.8, heads: 7.5, build: 1, shoulders: 1, hips: 1, bust: 0, skin: '#d9c7a9' };
+function shade(hex, f) { const c = new THREE.Color(hex); const h = {}; c.getHSL(h); c.setHSL(h.h, h.s, clamp(h.l + f, 0, 1)); return '#' + c.getHexString(); }
+const lineMat = noOutline(new THREE.LineBasicMaterial({ color: 0x2f7dff, transparent: true, opacity: 0.95 }));
+function ellipse(ax, ay, plane, off = [0, 0, 0]) {
+  const pts = [];
+  for (let i = 0; i < 72; i++) { const a = i / 72 * Math.PI * 2, c = Math.cos(a) * ax, s = Math.sin(a) * ay;
+    pts.push(plane === 'xz' ? new V(c + off[0], off[1], s + off[2]) : new V(off[0], c + off[1], s + off[2])); }
+  const l = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), lineMat); l.userData.construction = true; return l;
+}
+
+function buildCharacter(def) {
+  const b = { ...BODY_DEFAULT, ...(def.body || {}) };
+  b.height = clamp(num(b.height, 1.8), 0.3, 6); b.heads = clamp(num(b.heads, 7.5), 2, 10);
+  b.build = clamp(num(b.build, 1), 0.5, 2); b.shoulders = clamp(num(b.shoulders, 1), 0.6, 1.7);
+  b.hips = clamp(num(b.hips, 1), 0.6, 1.6); b.bust = clamp(num(b.bust, 0), 0, 1); b.skin = normColor(b.skin, BODY_DEFAULT.skin);
+  const H = b.height, hh = H / b.heads, k = (H - hh) / 1.548, hs = hh / 0.24, W = b.build, wm = 0.5 + 0.5 * W;
+  const skin = b.skin, jc = shade(skin, -0.1);
+  const fig = new THREE.Group(), bones = {}, skins = {};
+  const bone = (name, parent, x, y, z, scl) => {
+    const g = new THREE.Group(); g.name = name; g.position.set(x, y, z);
+    g.rotation.order = TORSO.has(name) ? 'YXZ' : 'XZY'; g.userData.bone = name;
+    (parent ? bones[parent] : fig).add(g); bones[name] = g;
+    const s = new THREE.Group(); s.scale.set(...scl); s.userData.bone = name; g.add(s); skins[name] = s; return s;
+  };
+  const P = (s, spec, joint = false) => { const m = makePart({ ...spec, color: joint ? jc : skin }, { body: true, joint }); s.add(m); return m; };
+  let s;
+  s = bone('hips', null, 0, 0.972 * k, 0, [k * b.hips * wm, k, k * W]);
+  P(s, { shape: 'sphere', size: [0.33, 0.21, 0.2], pos: [0, -0.01, 0] });
+  s = bone('spine', 'hips', 0, 0.084 * k, 0, [k * wm, k, k * W]);
+  P(s, { shape: 'cylinder', size: [0.25, 0.2, 0.165], taper: 1.06, pos: [0, 0.05, 0] });
+  s = bone('chest', 'spine', 0, 0.168 * k, 0, [k * b.shoulders * wm, k, k * W]);
+  P(s, { shape: 'sphere', size: [0.31, 0.29, 0.21], pos: [0, 0.108, 0] });
+  P(s, { shape: 'capsule', size: [0.085, 0.37, 0.085], rot: [0, 0, 90], pos: [0, 0.19, -0.012] });
+  if (b.bust > 0.04) for (const sd of [1, -1]) { const f = 0.55 + 0.6 * b.bust;
+    P(s, { shape: 'sphere', size: [0.115 * f, 0.105 * f, 0.1 * f], pos: [sd * 0.058, 0.07, 0.07 + 0.025 * f] }); }
+  const nw = 0.7 + 0.3 * W;
+  s = bone('neck', 'chest', 0, 0.24 * k, 0, [k * nw, k, k * nw]);
+  P(s, { shape: 'cylinder', size: [0.095, 0.15, 0.1], taper: 0.92, pos: [0, 0.035, 0.004] });
+  s = bone('head', 'neck', 0, 0.084 * k, 0, [hs, hs, hs]);
+  s.position.y = 0.12 * hs;
+  P(s, { shape: 'sphere', size: [0.19, 0.215, 0.22], pos: [0, 0.014, -0.006] });
+  P(s, { shape: 'sphere', size: [0.135, 0.13, 0.15], pos: [0, -0.052, 0.03] });
+  P(s, { shape: 'cone', size: [0.032, 0.05, 0.034], rot: [90, 0, 0], pos: [0, -0.012, 0.112] }, true);
+  for (const sd of [1, -1]) P(s, { shape: 'sphere', size: [0.022, 0.055, 0.035], pos: [sd * 0.094, -0.005, -0.004] }, true);
+  const hg = new THREE.Group(); hg.userData.headLines = true;
+  hg.add(ellipse(0.0985, 0.115, 'xz', [0, 0, -0.004]));
+  hg.add(ellipse(0.128, 0.116, 'yz', [0, -0.008, 0]));
+  hg.add(ellipse(0.075, 0.104, 'xz', [0, -0.058, 0.012]));
+  hg.visible = $('#headT').checked; s.add(hg);
+  for (const sd of [1, -1]) {
+    const x = sd > 0 ? '_l' : '_r';
+    s = bone('upperarm' + x, 'chest', sd * 0.165 * k * b.shoulders * wm, 0.2 * k, -0.006 * k, [k * W, k, k * W]);
+    P(s, { shape: 'sphere', size: [0.105, 0.105, 0.105] }, true);
+    P(s, { shape: 'cylinder', size: [0.072, 0.31, 0.077], taper: 1.33, pos: [0, -0.17, 0] });
+    s = bone('forearm' + x, 'upperarm' + x, 0, -0.336 * k, 0, [k * W, k, k * W]);
+    P(s, { shape: 'sphere', size: [0.074, 0.074, 0.074] }, true);
+    P(s, { shape: 'cylinder', size: [0.05, 0.26, 0.058], taper: 1.42, pos: [0, -0.137, 0] });
+    const hw = 0.75 + 0.25 * W;
+    s = bone('hand' + x, 'forearm' + x, 0, -0.276 * k, 0, [k * hw, k, k * hw]);
+    P(s, { shape: 'sphere', size: [0.052, 0.052, 0.052] }, true);
+    P(s, { shape: 'box', size: [0.032, 0.095, 0.082], pos: [0, -0.055, 0.003] });
+    P(s, { shape: 'box', size: [0.026, 0.075, 0.078], pos: [sd * 0.003, -0.14, 0.004], rot: [6, 0, 0] });
+    P(s, { shape: 'box', size: [0.022, 0.06, 0.022], pos: [-sd * 0.016, -0.045, 0.046], rot: [-25, 0, 0] });
+    s = bone('thigh' + x, 'hips', sd * 0.096 * k * b.hips * wm, -0.036 * k, 0, [k * W, k, k * W]);
+    P(s, { shape: 'sphere', size: [0.135, 0.135, 0.135] }, true);
+    P(s, { shape: 'cylinder', size: [0.104, 0.43, 0.115], taper: 1.45, pos: [0, -0.222, 0.005] });
+    s = bone('shin' + x, 'thigh' + x, 0, -0.444 * k, 0, [k * W, k, k * W]);
+    P(s, { shape: 'sphere', size: [0.098, 0.098, 0.098] }, true);
+    P(s, { shape: 'cylinder', size: [0.068, 0.41, 0.078], taper: 1.5, pos: [0, -0.21, -0.006] });
+    const fw = 0.8 + 0.2 * W;
+    s = bone('foot' + x, 'shin' + x, 0, -0.42 * k, 0, [k * fw, k, k]);
+    P(s, { shape: 'sphere', size: [0.066, 0.066, 0.066] }, true);
+    P(s, { shape: 'box', size: [0.085, 0.06, 0.19], pos: [0, -0.04, 0.05] });
+    P(s, { shape: 'box', size: [0.08, 0.035, 0.05], pos: [0, -0.0525, 0.165] });
+  }
+  for (const p of (def.parts || [])) {
+    const bn = BONES.includes(p.bone) ? p.bone : null;
+    const m = makePart(p, { attach: true });
+    if (bn) skins[bn].add(m); else fig.add(m);
+  }
+  return { fig, bones, skins };
+}
+
+/* ================= poses ================= */
+const POSES = {
+  'Stand': { upperarm_l: { z: 8 }, upperarm_r: { z: 8 }, forearm_l: { x: 8 }, forearm_r: { x: 8 } },
+  'Contrapposto': { hips: { z: -4, y: 6 }, chest: { z: 6, y: -8 }, head: { z: -4, y: 10 }, thigh_l: { z: 3, x: 2 }, thigh_r: { x: -6, z: -1 }, shin_r: { x: 16 }, upperarm_l: { z: 10, x: -4 }, upperarm_r: { z: 9, x: 6 }, forearm_l: { x: 15 }, forearm_r: { x: 12 } },
+  'Walk': { hips: { y: 6 }, chest: { y: -9 }, upperarm_l: { x: -22, z: 6 }, upperarm_r: { x: 22, z: 6 }, forearm_l: { x: 18 }, forearm_r: { x: 30 }, thigh_l: { x: 24 }, shin_l: { x: 8 }, thigh_r: { x: -18 }, shin_r: { x: 28 } },
+  'Run': { hips: { x: 12, y: 10 }, spine: { x: 6 }, chest: { x: 6, y: -18 }, head: { x: -16 }, upperarm_l: { x: -45, z: 10 }, forearm_l: { x: 95 }, upperarm_r: { x: 55, z: 10 }, forearm_r: { x: 100 }, thigh_l: { x: 70 }, shin_l: { x: 75 }, foot_l: { x: 10 }, thigh_r: { x: -25 }, shin_r: { x: 95 }, lift: 0.08 },
+  'Sit': { spine: { x: -4 }, thigh_l: { x: 90, z: 4 }, thigh_r: { x: 90, z: 4 }, shin_l: { x: 90 }, shin_r: { x: 90 }, upperarm_l: { x: 22, z: 8 }, upperarm_r: { x: 22, z: 8 }, forearm_l: { x: 50 }, forearm_r: { x: 50 } },
+  'Crouch': { spine: { x: 35 }, chest: { x: 10 }, neck: { x: -15 }, head: { x: -25 }, thigh_l: { x: 115, z: 10 }, thigh_r: { x: 115, z: 10 }, shin_l: { x: 140 }, shin_r: { x: 140 }, foot_l: { x: -25 }, foot_r: { x: -25 }, upperarm_l: { x: 35, z: 12 }, upperarm_r: { x: 35, z: 12 }, forearm_l: { x: 45 }, forearm_r: { x: 45 } },
+  'Kneel': { thigh_l: { x: 90 }, shin_l: { x: 90 }, thigh_r: { x: -4 }, shin_r: { x: 95 }, foot_r: { x: -20 }, upperarm_l: { x: 30, z: 8 }, forearm_l: { x: 60 }, upperarm_r: { z: 10 }, forearm_r: { x: 15 } },
+  'Fight': { hips: { y: -25 }, chest: { y: 20 }, head: { y: 8 }, thigh_l: { x: 22, z: 10 }, shin_l: { x: 28 }, thigh_r: { x: -18, z: 8 }, shin_r: { x: 22 }, upperarm_l: { x: 55, z: 22 }, forearm_l: { x: 115 }, upperarm_r: { x: 40, z: 30 }, forearm_r: { x: 130 }, hand_l: { x: 10 } },
+  'Point': { upperarm_r: { x: 88, z: 6 }, forearm_r: { x: 5 }, head: { y: -8 }, upperarm_l: { z: 10 }, forearm_l: { x: 10 }, thigh_r: { x: 6 }, thigh_l: { x: -4 } },
+  'Think': { upperarm_r: { x: 45, z: 10 }, forearm_r: { x: 145 }, hand_r: { x: 25 }, upperarm_l: { x: 28, z: 14 }, forearm_l: { x: 100, y: 30 }, head: { x: 12, y: -8 }, chest: { x: 5 } },
+  'Cheer': { upperarm_l: { z: 155, x: 10 }, upperarm_r: { z: 155, x: 10 }, forearm_l: { x: 20 }, forearm_r: { x: 20 }, head: { x: -15 } },
+  'Jump': { thigh_l: { x: 60 }, shin_l: { x: 110 }, thigh_r: { x: 30 }, shin_r: { x: 100 }, foot_l: { x: 30 }, foot_r: { x: 30 }, upperarm_l: { z: 140, x: 20 }, upperarm_r: { z: 140, x: 20 }, forearm_l: { x: 20 }, forearm_r: { x: 20 }, head: { x: -10 }, lift: 0.5 },
+  'Hero land': { spine: { x: 38 }, chest: { x: 6 }, head: { x: -35 }, thigh_l: { x: 110, z: 15 }, shin_l: { x: 128 }, foot_l: { x: -18 }, thigh_r: { x: -8, z: 28 }, shin_r: { x: 105 }, upperarm_r: { x: 48, z: 8 }, forearm_r: { x: 0 }, upperarm_l: { x: -55, z: 40 }, forearm_l: { x: 20 } },
+  'Lying': { hips: { x: -90 }, upperarm_l: { z: 15 }, upperarm_r: { z: 15 }, head: { y: 10 } },
+  'T-pose': { upperarm_l: { z: 90 }, upperarm_r: { z: 90 } },
+};
+
+/* ================= objects ================= */
+let objects = [], nextId = 1, sel = null, selBone = null, mode = 'pose';
+function localBox(target, rel, filter) {
+  rel.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(rel.matrixWorld).invert(), box = new THREE.Box3(), mm = new THREE.Matrix4(), b = new THREE.Box3();
+  target.traverse(o => {
+    if (o.isMesh && (!filter || filter(o))) {
+      if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+      mm.multiplyMatrices(inv, o.matrixWorld); b.copy(o.geometry.boundingBox).applyMatrix4(mm); box.union(b);
+    }
+  });
+  return box;
+}
+function applyPose(o) {
+  if (o.kind !== 'character') return;
+  for (const b of BONES) {
+    const v = o.pose[b] || {}, sg = signs(b);
+    o.bones[b].rotation.set(sg[0] * num(v.x) * D2R, sg[1] * num(v.y) * D2R, sg[2] * num(v.z) * D2R);
+  }
+  regroundChar(o);
+}
+function regroundChar(o) {
+  o.fig.position.y = 0;
+  const box = localBox(o.fig, o.root, m => m.userData.body);
+  if (!box.isEmpty()) o.fig.position.y = -box.min.y + clamp(num(o.pose.lift), -2, 50);
+}
+function buildProp(def) {
+  const fig = new THREE.Group();
+  for (const p of (def.parts || [])) fig.add(makePart(p));
+  return fig;
+}
+function rebuild(o) {
+  while (o.root.children.length) o.root.remove(o.root.children[0]);
+  o.kind = o.def.kind === 'character' ? 'character' : 'prop';
+  if (o.def.kind === 'mesh') {
+    o.fig = o.meshSrc; o.fig.position.y = 0; o.root.add(o.fig);
+    const box = localBox(o.fig, o.root); if (!box.isEmpty()) o.fig.position.y = -box.min.y;
+  } else if (o.kind === 'character') {
+    const c = buildCharacter(o.def); o.fig = c.fig; o.bones = c.bones; o.skins = c.skins; o.root.add(c.fig); applyPose(o);
+  } else {
+    o.fig = buildProp(o.def); o.root.add(o.fig);
+    o.fig.position.y = 0; const box = localBox(o.fig, o.root);
+    if (!box.isEmpty()) o.fig.position.y = -box.min.y;
+  }
+  markHighlight(); applyStyleTo(o.root);
+  if (sel === o) attachGizmo();
+}
+function addObject(def, opts = {}) {
+  const o = { id: nextId++, def: JSON.parse(JSON.stringify(def)), name: def.name || 'Untitled', pose: JSON.parse(JSON.stringify(def.pose || {})), root: new THREE.Group(), meshSrc: opts.mesh || null };
+  o.root.userData.objId = o.id; world.add(o.root);
+  rebuild(o);
+  if (opts.t) {
+    o.root.position.fromArray(opts.t.p); o.root.quaternion.fromArray(opts.t.q); o.root.scale.fromArray(opts.t.s);
+  } else if (objects.length) {
+    let maxX = -Infinity; for (const x of objects) { const bx = new THREE.Box3().setFromObject(x.root); if (!bx.isEmpty()) maxX = Math.max(maxX, bx.max.x); }
+    const mine = new THREE.Box3().setFromObject(o.root); const half = mine.isEmpty() ? 0.3 : (mine.max.x - mine.min.x) / 2;
+    o.root.position.x = (isFinite(maxX) ? maxX : 0) + half + 0.35 - (mine.isEmpty() ? 0 : (mine.max.x + mine.min.x) / 2);
+  }
+  objects.push(o);
+  if (!opts.silent) { select(o); save(); }
+  renderList();
+  return o;
+}
+function removeObject(o) {
+  if (sel === o) select(null);
+  world.remove(o.root); objects = objects.filter(x => x !== o); renderList(); save();
+}
+function objOf(node) { while (node) { if (node.userData && node.userData.objId) return objects.find(o => o.id === node.userData.objId); node = node.parent; } return null; }
+function boneOf(node) { while (node) { if (node.userData && node.userData.bone) return node.userData.bone; node = node.parent; } return null; }
+
+/* ================= selection & gizmo ================= */
+function markHighlight() {
+  world.traverse(m => { if (m.isMesh && m.userData.styleable) m.userData.hl = false; });
+  if (sel && sel.kind === 'character' && selBone && sel.skins[selBone])
+    sel.skins[selBone].children.forEach(m => { if (m.isMesh) m.userData.hl = true; });
+  applyStyleTo(world);
+}
+function attachGizmo() {
+  if (!sel) { tc.detach(); return; }
+  if (mode === 'pose' && sel.kind === 'character' && selBone) { tc.attach(sel.bones[selBone]); tc.setMode('rotate'); tc.setSpace('local'); }
+  else if (mode === 'pose') { tc.attach(sel.root); tc.setMode('translate'); tc.setSpace('world'); }
+  else { tc.attach(sel.root); tc.setMode(mode); tc.setSpace(mode === 'scale' ? 'local' : 'world'); }
+  tc.showY = !(tc.mode === 'rotate' && tc.object === sel.root) ; tc.showX = tc.showZ = true;
+  if (tc.mode === 'rotate' && tc.object === sel.root) { tc.showX = tc.showZ = false; tc.showY = true; }
+}
+function select(o, bone = null) {
+  sel = o; selBone = o && o.kind === 'character' ? bone : null;
+  markHighlight(); attachGizmo(); renderList(); renderInspector();
+  if (typeof mobileOnSelect === 'function') mobileOnSelect();
+}
+function setMode(m) {
+  mode = m;
+  document.querySelectorAll('#modeSeg button').forEach(b => b.classList.toggle('on', b.dataset.v === m));
+  if (m !== 'pose' && selBone) { selBone = null; markHighlight(); renderInspector(); }
+  attachGizmo();
+}
+tc.addEventListener('dragging-changed', e => {
+  controls.enabled = !e.value;
+  if (!e.value && sel) { if (sel.kind === 'character') regroundChar(sel); save(); if (selBone) renderInspector(); }
+});
+tc.addEventListener('objectChange', () => {
+  if (sel && selBone && tc.object === sel.bones[selBone]) {
+    const r = sel.bones[selBone].rotation, sg = signs(selBone), lift = sel.pose.lift;
+    const v = { x: +(r.x / D2R * sg[0]).toFixed(1), y: +(r.y / D2R * sg[1]).toFixed(1), z: +(r.z / D2R * sg[2]).toFixed(1) };
+    sel.pose[selBone] = v; if (lift != null) sel.pose.lift = lift;
+    syncJointSliders();
+  }
+});
+
+/* picking */
+const ray = new THREE.Raycaster(); let downAt = null;
+glc.addEventListener('pointerdown', e => { downAt = (tc.axis || tc.dragging) ? null : [e.clientX, e.clientY]; });
+glc.addEventListener('pointerup', e => {
+  if (!downAt || e.button !== 0) return;
+  if (Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 5) return;
+  const r = glc.getBoundingClientRect();
+  ray.setFromCamera(new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1), camera);
+  const hit = ray.intersectObjects(world.children, true).find(h => h.object.isMesh && h.object.userData.styleable);
+  if (!hit) { select(null); return; }
+  const o = objOf(hit.object);
+  if (!o) return;
+  if (mode === 'pose' && o.kind === 'character') select(o, boneOf(hit.object));
+  else select(o);
+});
+
+/* ================= UI: list & inspector ================= */
+function renderList() {
+  const el = $('#list'); el.innerHTML = '';
+  if (!objects.length) { el.innerHTML = '<div class="empty">Nothing here yet — search for something above.</div>'; return; }
+  for (const o of objects) {
+    const d = document.createElement('div'); d.className = 'item' + (o === sel ? ' sel' : '');
+    d.innerHTML = `<span class="ic">${o.kind === 'character' ? '🧍' : o.def.kind === 'mesh' ? '🗿' : '📦'}</span><span class="nm"></span><button class="x" title="Hide/show">${o.root.visible ? '◉' : '○'}</button><button class="x" title="Delete">✕</button>`;
+    d.querySelector('.nm').textContent = o.name;
+    const [vis, del] = d.querySelectorAll('.x');
+    vis.onclick = ev => { ev.stopPropagation(); o.root.visible = !o.root.visible; renderList(); };
+    del.onclick = ev => { ev.stopPropagation(); removeObject(o); };
+    d.onclick = () => select(o);
+    el.appendChild(d);
+  }
+}
+function sliderHTML(id, label, min, max, step, val, unit = '') {
+  return `<div class="slider"><label title="${label}">${label}</label><input type="range" data-k="${id}" min="${min}" max="${max}" step="${step}" value="${val}"><output>${(+val).toFixed(step < 0.1 ? 2 : (step < 1 ? 1 : 0))}${unit}</output></div>`;
+}
+const BODY_SLIDERS = [['height', 'Height (m)', 0.4, 4, 0.01], ['heads', 'Heads tall', 2.5, 9, 0.1], ['build', 'Build', 0.6, 1.8, 0.01], ['shoulders', 'Shoulders', 0.7, 1.5, 0.01], ['hips', 'Hips', 0.7, 1.4, 0.01], ['bust', 'Chest/bust', 0, 1, 0.01]];
+const BODY_PRESETS = {
+  'Average man': { height: 1.78, heads: 7.5, build: 1, shoulders: 1.05, hips: 0.95, bust: 0 },
+  'Average woman': { height: 1.66, heads: 7.4, build: 0.92, shoulders: 0.9, hips: 1.12, bust: 0.55 },
+  'Heroic': { height: 1.92, heads: 8.5, build: 1.2, shoulders: 1.28, hips: 0.95, bust: 0 },
+  'Teen': { height: 1.6, heads: 7, build: 0.86, shoulders: 0.92, hips: 0.95, bust: 0 },
+  'Child': { height: 1.15, heads: 5.5, build: 0.88, shoulders: 0.9, hips: 0.95, bust: 0 },
+  'Chibi': { height: 0.9, heads: 3, build: 1.05, shoulders: 0.95, hips: 1, bust: 0 },
+  'Brute': { height: 2.3, heads: 8, build: 1.7, shoulders: 1.45, hips: 1.1, bust: 0 },
+};
+function renderInspector() {
+  const el = $('#inspector');
+  if (!sel) { el.innerHTML = `<h2>Selected</h2><div class="empty">Click something in the scene to pose or edit it. In <b>Pose</b> mode, click a body part to bend that joint.</div>`; return; }
+  const o = sel;
+  let h = `<h2><span class="nm"></span><span class="row" style="gap:4px"><button class="btn" data-act="frame" style="padding:3px 8px;font-size:12px">Frame</button><button class="btn" data-act="dup" style="padding:3px 8px;font-size:12px">Duplicate</button><button class="btn danger" data-act="del" style="padding:3px 8px;font-size:12px">Delete</button></span></h2>`;
+  h += `<div class="row" style="margin:-2px 0 8px;gap:5px">${Lib.ready ? (isObjSaved(o) ? '<span class="pill ok">Saved</span>' : '<span class="pill">Unsaved</span>') : ''}<button class="btn" data-act="saveobj" style="padding:3px 8px;font-size:12px">💾 Save ${o.kind === 'character' ? 'character' : 'object'}</button>${o.kind === 'character' ? '<button class="btn" data-act="savepose" style="padding:3px 8px;font-size:12px">💾 Save pose</button>' : ''}<button class="btn" data-act="dlobj" style="padding:3px 8px;font-size:12px" title="Download to your device">⬇ Download</button></div>`;
+  if (o.kind === 'character') {
+    h += `<div class="sub" style="margin-top:0">Pose</div><div class="grid-btns">${Object.keys(POSES).map(p => `<button class="btn" data-pose="${p}">${p}</button>`).join('')}</div>`;
+    h += `<div class="row" style="margin-top:6px"><button class="btn" data-act="mirror">⇋ Mirror pose</button><button class="btn" data-act="resetpose">Reset</button></div>`;
+    if (refImages().length) h += `<div class="row" style="margin-top:6px"><button class="btn on" data-act="copypose" ${aiCanUseImages() ? '' : 'disabled'} title="Match this mannequin's pose to the figure in your reference image">🖼 Copy pose from reference</button></div>`;
+    h += `<div class="sub">Joint</div><select id="jointSel" style="width:100%"><option value="">— click a body part or pick one —</option>${BONES.map(b => `<option value="${b}" ${b === selBone ? 'selected' : ''}>${NICE[b]}</option>`).join('')}</select>`;
+    h += `<div id="jointSliders"></div>`;
+    h += sliderHTML('lift', 'Lift off ground', 0, 3, 0.01, num(o.pose.lift), ' m').replace('data-k=', 'data-lift="1" data-k=');
+    const b = { ...BODY_DEFAULT, ...(o.def.body || {}) };
+    h += `<div class="sub">Body type</div><div class="grid-btns" style="grid-template-columns:repeat(4,1fr)">${Object.keys(BODY_PRESETS).map(p => `<button class="btn" data-body="${p}" style="font-size:11.5px">${p}</button>`).join('')}</div>`;
+    h += `<div id="bodySliders">${BODY_SLIDERS.map(([k, l, a, z, s]) => sliderHTML(k, l, a, z, s, num(b[k], BODY_DEFAULT[k]))).join('')}</div>`;
+    h += `<div class="slider"><label>Skin / mannequin</label><input type="color" id="skinC" value="${normColor(b.skin)}" style="width:100%;height:24px;border:0;background:none"><span></span></div>`;
+  } else {
+    const yaw = new THREE.Euler().setFromQuaternion(o.root.quaternion, 'YXZ').y / D2R;
+    h += sliderHTML('pscale', 'Scale', 0.1, 5, 0.01, o.root.scale.x, '×');
+    h += sliderHTML('pyaw', 'Turn', -180, 180, 1, Math.round(yaw), '°');
+    h += `<div class="hint">${o.def.kind === 'mesh' ? 'Imported 3D file (stays for this visit only; it isn’t saved with the scene)' : (o.def.parts || []).length + ' parts'} · use Move / Rotate on the toolbar to place it.</div>`;
+  }
+  if (o.def.kind !== 'mesh') {
+    h += `<div class="sub">Change it with words ${aiReady() ? '' : '<span class="badge lib">needs AI</span>'}</div><textarea id="refineT" placeholder="${o.kind === 'character' ? 'e.g. add a long trench coat and fedora, make her sit cross-legged' : 'e.g. make it a convertible, add a roof rack'}"></textarea>`;
+    if (refs.length) h += `<label class="check" style="margin-top:5px"><input type="checkbox" id="refineUseRefs" checked> Use my ${refs.length} reference${refs.length > 1 ? 's' : ''}</label>`;
+    h += `<div class="row" style="margin-top:6px"><button class="btn primary" data-act="refine" ${aiReady() ? '' : 'disabled'}>Apply change</button></div>`;
+  }
+  el.innerHTML = h;
+  el.querySelector('h2 .nm').textContent = o.name;
+  if (o.kind === 'character') syncJointSliders(true);
+}
+function syncJointSliders(rebuildHtml = false) {
+  const box = $('#jointSliders'); if (!box || !sel || sel.kind !== 'character') return;
+  if (!selBone) { box.innerHTML = '<div class="hint">Tip: in Pose mode click any body part, then drag the rotation rings or use the sliders.</div>'; return; }
+  const v = sel.pose[selBone] || {};
+  if (rebuildHtml || !box.dataset.bone || box.dataset.bone !== selBone) {
+    box.dataset.bone = selBone;
+    box.innerHTML = axesFor(selBone).map(([ax, l]) => sliderHTML('j_' + ax, l, -180, 180, 1, Math.round(num(v[ax])), '°')).join('') + `<button class="btn" data-act="resetjoint" style="font-size:12px;padding:4px 8px">Reset joint</button>`;
+  } else {
+    box.querySelectorAll('input[type=range]').forEach(i => { const ax = i.dataset.k.slice(2); i.value = Math.round(num(v[ax])); i.nextElementSibling.textContent = Math.round(num(v[ax])) + '°'; });
+  }
+}
+$('#inspector').addEventListener('input', e => {
+  const t = e.target, o = sel; if (!o) return;
+  if (t.type === 'range') {
+    const k = t.dataset.k, val = +t.value;
+    if (t.nextElementSibling) t.nextElementSibling.textContent = (t.step < 0.1 ? val.toFixed(2) : t.step < 1 ? val.toFixed(1) : val) + (t.nextElementSibling.textContent.replace(/^[-\d.]+/, ''));
+    if (k.startsWith('j_') && selBone) { const ax = k.slice(2); o.pose[selBone] = { ...(o.pose[selBone] || {}), [ax]: val }; applyPose(o); }
+    else if (k === 'lift') { o.pose.lift = val; regroundChar(o); }
+    else if (k === 'pscale') { o.root.scale.setScalar(val); }
+    else if (k === 'pyaw') { o.root.rotation.set(0, val * D2R, 0); }
+    else if (BODY_SLIDERS.some(s => s[0] === k)) { o.def.body = { ...BODY_DEFAULT, ...(o.def.body || {}), [k]: val }; rebuild(o); }
+    saveSoon();
+  } else if (t.id === 'skinC') { o.def.body = { ...BODY_DEFAULT, ...(o.def.body || {}), skin: t.value }; rebuild(o); saveSoon(); }
+});
+$('#inspector').addEventListener('change', e => {
+  if (e.target.id === 'jointSel' && sel) { select(sel, e.target.value || null); if (mode !== 'pose') setMode('pose'); }
+});
+$('#inspector').addEventListener('click', async e => {
+  const t = e.target.closest('button'); if (!t || !sel) return;
+  const o = sel;
+  if (t.dataset.pose) { o.pose = JSON.parse(JSON.stringify(POSES[t.dataset.pose])); applyPose(o); renderInspector(); save(); return; }
+  if (t.dataset.body) { o.def.body = { ...BODY_DEFAULT, ...(o.def.body || {}), ...BODY_PRESETS[t.dataset.body] }; rebuild(o); renderInspector(); save(); return; }
+  const a = t.dataset.act;
+  if (a === 'saveobj') { t.disabled = true; await saveObject(o); return; }
+  if (a === 'savepose') { t.disabled = true; await savePose(o); t.disabled = false; return; }
+  if (a === 'dlobj') { await downloadObject(o); return; }
+  if (a === 'frame') viewPreset('threeq');
+  if (a === 'dup') {
+    let mesh = null;
+    if (o.def.kind === 'mesh') { const { clone } = await import('three/addons/utils/SkeletonUtils.js'); mesh = clone(o.meshSrc); }
+    const n = addObject({ ...o.def, pose: o.pose, name: o.name }, { mesh }); n.root.quaternion.copy(o.root.quaternion); n.root.scale.copy(o.root.scale); save();
+  }
+  if (a === 'copypose') {
+    t.disabled = true;
+    try {
+      const r = await generate('', 'character', { ...o.def, pose: o.pose }, { poseOnly: true, useRefs: true });
+      if (r && r.pose) { o.pose = r.pose; applyPose(o); renderInspector(); save(); setStatus('Pose copied from your reference.'); }
+    } finally { t.disabled = false; }
+    return;
+  }
+  if (a === 'del') removeObject(o);
+  if (a === 'mirror') { const p = {}; for (const [k, v] of Object.entries(o.pose)) p[k.endsWith('_l') ? k.slice(0, -2) + '_r' : k.endsWith('_r') ? k.slice(0, -2) + '_l' : k] = TORSO.has(k) && v ? { ...v, y: -num(v.y), z: -num(v.z) } : v; o.pose = p; applyPose(o); syncJointSliders(true); save(); }
+  if (a === 'resetpose') { o.pose = {}; applyPose(o); syncJointSliders(true); renderInspector(); save(); }
+  if (a === 'resetjoint' && selBone) { delete o.pose[selBone]; applyPose(o); syncJointSliders(true); save(); }
+  if (a === 'refine') {
+    const useR = !!($('#refineUseRefs') && $('#refineUseRefs').checked && refs.length);
+    const txt = $('#refineT').value.trim() || (useR ? 'Make it match the reference more closely.' : ''); if (!txt) return;
+    t.disabled = true;
+    try {
+      const base = { ...o.def, pose: o.kind === 'character' ? o.pose : undefined };
+      const useRefs = !!($('#refineUseRefs') && $('#refineUseRefs').checked);
+      const def = await generate(txt, o.kind, base, { useRefs });
+      if (def) {
+        o.def = def; o.name = def.name || o.name;
+        if (def.kind === 'character' && def.pose) o.pose = def.pose;
+        rebuild(o); renderList(); renderInspector(); save(); setStatus('Updated ' + o.name + '.');
+      }
+    } finally { t.disabled = false; }
+  }
+});
+
+/* ================= AI generation ================= */
+let sampleFn = null, downloadsCap = null, aiState = 'pending', busy = null, imgLimits = null, aiImages = true, lastErr = null;
+addEventListener('error', e => { try { setStatus('Something broke: ' + (e.message || 'unknown error') + '. Reload the page; if it keeps happening, tell me this message.', 'err'); } catch { } });
+addEventListener('unhandledrejection', e => { try { console.warn(e.reason); setStatus('Something broke: ' + ((e.reason && (e.reason.code || e.reason.message)) || 'unknown error'), 'err'); } catch { } });
+const STANDALONE = !!window.PP_STANDALONE;
+const ST = { get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { } } };
+const PROVIDERS = {
+  claude: 'Claude (inside the Claude app)',
+  anthropic: 'Claude: with your Anthropic API key',
+  ollama: 'Ollama: free, runs on your PC',
+  gemini: 'Google Gemini: free API key',
+  openai: 'OpenAI-compatible (LM Studio, OpenRouter, Groq)',
+  none: 'No AI (library + Shape from image)',
+};
+let aiCfg = Object.assign({ provider: STANDALONE ? 'anthropic' : 'claude',
+  anthropic: { key: '', model: 'claude-sonnet-5-5' },
+  ollama: { url: 'http://localhost:11434', model: 'qwen3-vl:8b' },
+  gemini: { key: '', model: 'gemini-flash-latest' },
+  openai: { url: 'http://localhost:1234/v1', key: '', model: '' } }, ST.get('pp3d.ai', {}));
+if (!STANDALONE && aiCfg.provider !== 'none') aiCfg.provider = 'claude';
+if (!aiCfg.anthropic) aiCfg.anthropic = { key: '', model: 'claude-sonnet-5-5' };
+if (STANDALONE && aiCfg.provider === 'claude') aiCfg.provider = 'anthropic';
+const saveAiCfg = () => ST.set('pp3d.ai', aiCfg);
+function providerUsable(p) { if (p === 'claude') return !!sampleFn; if (p === 'none') return false; return STANDALONE; }
+const aiReady = () => providerUsable(aiCfg.provider);
+const blobToB64 = b => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = rej; r.readAsDataURL(b); });
+async function readStream(res, onLine) {
+  const rd = res.body.getReader(), dec = new TextDecoder(); let buf = '';
+  for (;;) { const { done, value } = await rd.read(); if (done) break; buf += dec.decode(value, { stream: true });
+    let i; while ((i = buf.indexOf('\n')) >= 0) { const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1); if (line) onLine(line); } }
+  if (buf.trim()) onLine(buf.trim());
+}
+async function httpFail(res, who) {
+  let body = ''; try { body = (await res.text()).slice(0, 300); } catch { }
+  const code = res.status === 401 || res.status === 403 ? 'key_rejected' : res.status === 429 ? 'free_limit_reached' : res.status === 404 ? 'model_not_found' : 'http_' + res.status;
+  throw { code, message: `${who}: ${body}` };
+}
+function netFail(e, who, url) { if (e && (e.name === 'AbortError')) throw { code: 'cancelled' }; throw { code: 'unreachable', message: `Couldn’t reach ${who} at ${url}` }; }
+// One call shape for every engine: returns the full reply text.
+async function aiCall(prompt, { images = [], onText, signal, quality, nocache, json = true } = {}) {
+  const p = aiCfg.provider; let text = '';
+  const push = d => { if (!d) return; text += d; onText && onText({ text }); };
+  if (p === 'claude') {
+    const o = { signal, modelTier: quality, onText };
+    if (images.length) o.images = images; if (nocache) o.cache = false;
+    return (await sampleFn(prompt, o)).text;
+  }
+  const imgs = [];
+  for (const b of images) imgs.push(await blobToB64(await toPng(b, 1280)));
+  if (p === 'ollama') {
+    const c = aiCfg.ollama, url = c.url.replace(/\/+$/, '');
+    let res;
+    try { res = await fetch(url + '/api/chat', { method: 'POST', signal, headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: c.model, stream: true, format: json ? 'json' : undefined, options: { temperature: 0.4, num_ctx: 16384 },
+        messages: [{ role: 'user', content: prompt, images: imgs.length ? imgs.map(d => d.split(',')[1]) : undefined }] }) }); }
+    catch (e) { netFail(e, 'Ollama', url); }
+    if (!res.ok) await httpFail(res, 'Ollama');
+    await readStream(res, line => { try { const j = JSON.parse(line); if (j.error) throw { code: 'ollama_error', message: j.error }; push(j.message && j.message.content); } catch (e) { if (e && e.code) throw e; } });
+    return text;
+  }
+  if (p === 'anthropic') {
+    const c = aiCfg.anthropic; if (!c.key) throw { code: 'no_api_key', message: 'Add your Anthropic API key in AI engine settings.' };
+    const model = quality === 'complex' ? 'claude-opus-5-5' : (c.model || 'claude-sonnet-5-5');
+    const content = [...imgs.map(d => ({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: d.split(',')[1] } })), { type: 'text', text: prompt }];
+    let res;
+    try { res = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', signal,
+      headers: { 'content-type': 'application/json', 'x-api-key': c.key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({ model, max_tokens: 16000, stream: true, messages: [{ role: 'user', content }] }) }); }
+    catch (e) { netFail(e, 'Claude', 'api.anthropic.com'); }
+    if (!res.ok) {
+      let body = ''; try { body = await res.text(); } catch { }
+      if (/credit balance/i.test(body)) throw { code: 'no_credit', message: 'Your Anthropic account has no credit left. Add credit in the Claude Console.' };
+      if (res.status === 529) throw { code: 'overloaded', message: 'Claude is overloaded right now. Try again in a minute.' };
+      const code = res.status === 401 || res.status === 403 ? 'key_rejected' : res.status === 429 ? 'free_limit_reached' : res.status === 404 ? 'model_not_found' : 'http_' + res.status;
+      throw { code, message: 'Claude: ' + body.slice(0, 200) };
+    }
+    await readStream(res, line => { if (!line.startsWith('data:')) return; try { const j = JSON.parse(line.slice(5)); if (j.type === 'content_block_delta' && j.delta && j.delta.type === 'text_delta') push(j.delta.text); if (j.type === 'error') throw { code: 'api_error', message: (j.error && j.error.message) || 'error' }; } catch (e) { if (e && e.code) throw e; } });
+    return text;
+  }
+  if (p === 'gemini') {
+    const c = aiCfg.gemini; if (!c.key) throw { code: 'no_api_key', message: 'Add your free Gemini API key in AI engine settings.' };
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(c.model)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(c.key)}`;
+    const parts = [{ text: prompt }, ...imgs.map(d => ({ inline_data: { mime_type: 'image/jpeg', data: d.split(',')[1] } }))];
+    let res;
+    try { res = await fetch(url, { method: 'POST', signal, headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ role: 'user', parts }], generationConfig: { temperature: 0.4, maxOutputTokens: 32768, ...(json ? { responseMimeType: 'application/json' } : {}) } }) }); }
+    catch (e) { netFail(e, 'Google Gemini', 'generativelanguage.googleapis.com'); }
+    if (!res.ok) await httpFail(res, 'Gemini');
+    await readStream(res, line => { if (!line.startsWith('data:')) return; try { const j = JSON.parse(line.slice(5)); for (const pt of (j.candidates?.[0]?.content?.parts || [])) if (!pt.thought) push(pt.text); } catch { } });
+    return text;
+  }
+  if (p === 'openai') {
+    const c = aiCfg.openai, url = c.url.replace(/\/+$/, '');
+    if (!c.model) throw { code: 'no_model', message: 'Type a model name in AI engine settings.' };
+    const content = imgs.length ? [{ type: 'text', text: prompt }, ...imgs.map(d => ({ type: 'image_url', image_url: { url: d } }))] : prompt;
+    let res;
+    try { res = await fetch(url + '/chat/completions', { method: 'POST', signal, headers: { 'Content-Type': 'application/json', ...(c.key ? { Authorization: 'Bearer ' + c.key } : {}) },
+      body: JSON.stringify({ model: c.model, stream: true, temperature: 0.4, messages: [{ role: 'user', content }] }) }); }
+    catch (e) { netFail(e, 'the AI server', url); }
+    if (!res.ok) await httpFail(res, 'AI server');
+    await readStream(res, line => { if (!line.startsWith('data:')) return; const d = line.slice(5).trim(); if (d === '[DONE]') return; try { const j = JSON.parse(d); push(j.choices?.[0]?.delta?.content); } catch { } });
+    return text;
+  }
+  throw { code: 'no_ai', message: 'No AI engine selected' };
+}
+async function capability(name) {
+  if (STANDALONE) return null;
+  for (let i = 0; i < 40 && !window.claude; i++) await new Promise(r => setTimeout(r, 100));
+  try { return window.claude && window.claude.use ? await window.claude.use(name) : null; } catch { return null; }
+}
+(async () => {
+  [sampleFn, downloadsCap] = await Promise.all([capability('sample'), capability('downloads')]);
+  aiState = aiReady() ? 'ai' : 'lib'; updateBadge(); renderAiBox();
+  if (sampleFn) { try { const L = await sampleFn.limits(); imgLimits = L && L.images ? L.images : null; aiImages = !!imgLimits; } catch { imgLimits = null; } }
+  else aiImages = STANDALONE;
+  renderTray();
+  updateRefHint();
+  if (!downloadsCap) { /* fallback modal handles saving */ }
+  if (sel) renderInspector();
+})();
+function updateBadge() {
+  const b = $('#aiBadge'); aiState = aiReady() ? 'ai' : 'lib';
+  if (aiState === 'ai') { b.textContent = { claude: 'AI: Claude', anthropic: 'AI: Claude (API)', ollama: 'AI: Ollama (free)', gemini: 'AI: Gemini (free)', openai: 'AI: custom' }[aiCfg.provider] || 'AI on'; b.className = 'badge'; b.title = 'Searches are modeled on the fly by ' + PROVIDERS[aiCfg.provider]; }
+  else if (aiState === 'lib') { b.textContent = 'Library mode'; b.className = 'badge lib'; b.title = 'AI modeling isn’t available here (it only works when the page is opened inside the Claude app), so searches use the built-in library and images use Shape from image'; }
+}
+const AI_HELP = {
+  claude: () => STANDALONE
+    ? 'This option only works when the page is opened inside the Claude app. Here, pick “Claude: with your Anthropic API key”, or a free engine (Gemini, or Ollama on a PC).'
+    : 'Runs on the Claude plan of whoever is using the page. If you share it, each person uses their own Claude plan, not yours. Want it completely free? Get the PC version (button at the top) and use Ollama or Gemini.',
+  anthropic: () => STANDALONE
+    ? `Uses Claude directly, outside the Claude app:<ol><li>Go to <b>console.anthropic.com</b>, sign in, add some credit and create an API key.</li><li>Paste the key above and click <b>Test connection</b>.</li></ol>This is billed pay-as-you-go to that Anthropic account (separate from a Claude.ai subscription). <b>Fast</b> uses the model above; <b>Detailed</b> uses Claude Opus. Your key is saved only on this device. Don’t share your copy of the app with the key in it.`
+    : 'For the PC and phone versions. Inside the Claude app, use “Claude (inside the Claude app)” instead: it needs no key.',
+  ollama: () => STANDALONE
+    ? `Free and private: the AI runs on your own computer, with no account and no limits.<ol><li>Install Ollama from <b>ollama.com</b> and open it.</li><li>In a terminal (Windows: Command Prompt) run <code>ollama pull ${esc(aiCfg.ollama.model)}</code>. On a weaker PC use <code>qwen3-vl:2b</code>.</li><li>Click <b>Test connection</b>.</li></ol>Speed depends on your graphics card; a build can take a minute or more. Small models make simpler shapes.`
+    : 'Only in the PC version: pages hosted inside Claude aren’t allowed to contact your computer. Click “💻 PC version” at the top to download it.',
+  gemini: () => STANDALONE
+    ? `Free tier, no card needed:<ol><li>Go to <b>aistudio.google.com</b>, sign in and click <b>Get API key</b>.</li><li>Paste the key above and click <b>Test connection</b>.</li></ol>The free tier has daily limits, and Google may use what you send to improve its products. Your key is saved only in this browser on this PC.`
+    : 'Only in the PC version: pages hosted inside Claude can’t contact other services. Click “💻 PC version” at the top to download it.',
+  openai: () => STANDALONE
+    ? `For any server that speaks the OpenAI chat format:<ol><li><b>LM Studio</b> (free, local): start its server, turn on <b>CORS</b> in its server settings, URL <code>http://localhost:1234/v1</code>, no key.</li><li><b>OpenRouter</b>: URL <code>https://openrouter.ai/api/v1</code>, a free key, and a model whose name ends in <code>:free</code>.</li></ol>For image references, pick a model that can see images.`
+    : 'Only in the PC version: pages hosted inside Claude can’t contact other services. Click “💻 PC version” at the top to download it.',
+  none: () => 'Searches use the built-in library of props and mannequins, and images use “Shape from image”. Nothing is sent anywhere.',
+};
+function esc(t) { return String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+function renderAiBox() {
+  const sel_ = $('#aiProv');
+  sel_.innerHTML = Object.entries(PROVIDERS).map(([k, l]) => {
+    const ok = k === 'none' || (k === 'claude' ? !STANDALONE : STANDALONE);
+    return `<option value="${k}" ${k === aiCfg.provider ? 'selected' : ''} ${ok ? '' : 'disabled'}>${l}${ok ? '' : (k === 'claude' ? ' (Claude app only)' : ' (PC version only)')}</option>`;
+  }).join('');
+  const p = aiCfg.provider, F = $('#aiFields');
+  const fld = (label, key, sub, ph, type = 'text') => `<label class="fld">${label}<input data-sub="${sub}" data-key="${key}" type="${type}" placeholder="${ph}" value="${esc(aiCfg[sub][key] || '')}" ${type === 'text' ? 'list="ollamaModels"' : ''} autocomplete="off" spellcheck="false"></label>`;
+  if (p === 'anthropic') F.innerHTML = fld('API key', 'key', 'anthropic', 'sk-ant-…', 'password') + fld('Model', 'model', 'anthropic', 'claude-sonnet-5-5');
+  else if (p === 'ollama') F.innerHTML = fld('Address', 'url', 'ollama', 'http://localhost:11434') + fld('Model', 'model', 'ollama', 'qwen3-vl:8b') + '<datalist id="ollamaModels"></datalist>';
+  else if (p === 'gemini') F.innerHTML = fld('API key', 'key', 'gemini', 'paste your free key', 'password') + fld('Model', 'model', 'gemini', 'gemini-flash-latest');
+  else if (p === 'openai') F.innerHTML = fld('URL', 'url', 'openai', 'http://localhost:1234/v1') + fld('API key', 'key', 'openai', 'blank for local servers', 'password') + fld('Model', 'model', 'openai', 'model name');
+  else F.innerHTML = '';
+  $('#aiTest').style.display = ['anthropic', 'ollama', 'gemini', 'openai'].includes(p) && STANDALONE ? '' : 'none';
+  $('#aiTestOut').textContent = '';
+  $('#aiHelp').innerHTML = AI_HELP[p]();
+  $('#aiName').textContent = PROVIDERS[p].split(':')[0].split(' (')[0] + (aiReady() || p === 'none' ? '' : ' (not available here)');
+  $('#qualSeg').style.display = p === 'claude' || p === 'anthropic' ? '' : 'none';
+  updateBadge();
+}
+$('#aiProv').addEventListener('change', e => { aiCfg.provider = e.target.value; saveAiCfg(); renderAiBox(); renderTray(); updateRefHint(); if (sel) renderInspector(); });
+$('#aiFields').addEventListener('input', e => { const i = e.target; if (!i.dataset.sub) return; aiCfg[i.dataset.sub][i.dataset.key] = i.value.trim(); saveAiCfg(); });
+$('#aiTest').addEventListener('click', async () => {
+  const out = $('#aiTestOut'), p = aiCfg.provider; out.textContent = 'Testing…'; out.style.color = '';
+  try {
+    if (p === 'ollama') {
+      const url = aiCfg.ollama.url.replace(/\/+$/, '');
+      let r; try { r = await fetch(url + '/api/tags'); } catch { throw new Error('Can’t reach Ollama. Is it installed and running?'); }
+      const j = await r.json(); const names = (j.models || []).map(m => m.name);
+      const dl = $('#ollamaModels'); if (dl) dl.innerHTML = names.map(n => `<option value="${esc(n)}">`).join('');
+      const want = aiCfg.ollama.model, has = names.some(n => n === want || n === want + ':latest' || n.split(':')[0] === want);
+      if (!names.length) throw new Error('Ollama is running but has no models. Run: ollama pull ' + want);
+      if (!has) throw new Error(`Connected, but “${want}” isn’t installed. Installed: ${names.slice(0, 6).join(', ')}. Pick one, or run: ollama pull ${want}`);
+      out.textContent = '✓ Connected. ' + want + ' is ready.';
+    } else {
+      const t = await aiCall('Reply with exactly this JSON: {"ok":true}', { json: true });
+      if (!/ok/.test(t)) throw new Error('Connected, but the reply was unexpected: ' + t.slice(0, 80));
+      out.textContent = '✓ Connected and working.';
+    }
+    out.style.color = 'var(--green)';
+  } catch (e) {
+    out.style.color = 'var(--red)';
+    out.textContent = e && e.code === 'no_credit' ? 'Key works, but the account has no credit.' : e && e.code === 'key_rejected' ? 'The key was rejected.' : e && e.code === 'free_limit_reached' ? 'Free limit reached for now.' : e && e.code === 'model_not_found' ? 'Model not found. Check the name.' : (e && (e.message || e.code)) || 'Failed';
+  }
+});
+$('#pcBtn').style.display = STANDALONE ? 'none' : '';
+$('#pcBtn').addEventListener('click', async () => {
+  try {
+    const r = await fetch('PerspectivePuppet-PC.html'); if (!r.ok) throw 0;
+    const b = new Blob([await r.text()], { type: 'text/html' });
+    await offerFile(b, 'PerspectivePuppet.html', false);
+    setStatus('PC version: save the file, then double-click it to open it in Chrome, Edge or Firefox. It needs an internet connection to load its 3D engine.');
+  } catch { setStatus('Couldn’t prepare the download here. Ask for the PC file in the chat instead.', 'err'); }
+});
+function setStatus(msg, kind = '') {
+  const s = $('#status'); s.className = 'status ' + (kind === 'err' ? 'err' : '');
+  s.innerHTML = '';
+  if (kind === 'busy') { const sp = document.createElement('span'); sp.className = 'spin'; s.appendChild(sp); }
+  const t = document.createElement('span'); t.textContent = msg; s.appendChild(t);
+  if (kind === 'busy') { const c = document.createElement('button'); c.className = 'btn'; c.style.cssText = 'padding:2px 8px;font-size:12px;margin-left:auto'; c.textContent = 'Cancel'; c.onclick = () => busy && busy.abort(); s.appendChild(c); }
+}
+
+const SPEC = `You are a precise 3D blockout modeler inside a perspective-reference app for comic artists. Turn the request into a 3D model made of simple primitives. Output ONLY one JSON object: no prose, no markdown fences. Put "parts" as the LAST key.
+
+COORDINATES: meters. Y is up. Ground is y=0. The model's FRONT faces +Z. The model's own left side is +X.
+"pos" = the part's center. "rot" = [x,y,z] degrees (Euler XYZ) about the part's own center.
+
+SHAPES ("size" is always the full extent [x,y,z] before rotation):
+- "box"
+- "sphere" (ellipsoid)
+- "hemisphere": dome toward +Y, its flat base sits at pos; size = [diameterX, height, diameterZ]
+- "cylinder": axis along Y. Optional "taper" = topDiameter/bottomDiameter (0-3, default 1)
+- "cone": axis Y, tip toward +Y
+- "pyramid": 4-sided, tip toward +Y
+- "capsule": axis Y, rounded ends
+- "torus": ring lying in the XY plane (hole faces Z); size = [outerDiameter, outerDiameter, tubeThickness]; optional "arc" degrees
+- "wedge": a ramp, full height along its -Z edge sloping down to zero at its +Z edge
+Orientation tips: a wheel = cylinder with rot [0,0,90]; a ring lying flat = torus with rot [90,0,0].
+
+PART: {"name":"short label","shape":"...","size":[x,y,z],"pos":[x,y,z],"rot":[x,y,z],"color":"#rrggbb"} plus optional "taper","arc","metal":true,"opacity":0.15-1 (glass).
+
+TWO KINDS:
+A) PROP: anything not humanoid: furniture, vehicles, buildings, rooms, weapons, tools, animals, creatures, plants, food, machines.
+{"kind":"prop","name":"...","parts":[...]}
+Real-world scale, resting on the ground (lowest point y=0), centered on x=0,z=0, front toward +Z.
+
+B) CHARACTER: any humanoid (person, superhero, knight, robot, alien, zombie, elf, etc.).
+{"kind":"character","name":"...","body":{...},"pose":{...},"parts":[...]}
+The app supplies a posable mannequin body. DO NOT model the body or limbs themselves. "parts" are only what is ON the body: hair, hats, helmets, masks, clothing, armor, capes, belts, boots, gloves, backpacks, held items, tails, wings, horns, robot plating. Every character part MUST have "bone".
+body: {"height":meters, "heads":2.5-9 (head-heights tall: 7.5 normal adult, 8-8.5 heroic, 6.5-7 teen, 5-5.5 child, 3 chibi), "build":0.6-1.8 (1 average, 1.6+ hulking), "shoulders":0.7-1.5, "hips":0.7-1.4, "bust":0-1, "skin":"#hex"}
+
+BONES: each part's pos/rot/size are in that bone's local frame, authored for the REFERENCE body (1.8 m, 7.5 heads, average build) in rest pose (standing straight, arms hanging at the sides). The app rescales parts to the actual body.
+- hips: origin = pelvis center, 0.97 m above ground. Pelvis about 0.33 wide, 0.2 deep. Belt line y=+0.04. Crotch y=-0.09.
+- spine: origin 0.08 above pelvis center (abdomen; waist about 0.26 wide, 0.17 deep, spans y 0 to +0.15).
+- chest: origin 0.25 above pelvis center. Ribcage center y=+0.11 (0.31 wide, 0.21 deep: front surface z=+0.105, back z=-0.105). Shoulder line y=+0.20, shoulder joints at x=+-0.165. Collar / base of neck y=+0.24.
+- neck: origin at the base of the neck; the head joint is 0.08 above it.
+- head: origin = CENTER of the head. Head 0.24 tall (crown y=+0.12, chin y=-0.12), 0.19 wide (ears at x=+-0.095), 0.22 deep (nose tip z=+0.12, back of skull z=-0.11). Eyes y=0, mouth y=-0.06.
+- upperarm_l / upperarm_r: origin at the shoulder joint; the upper arm hangs along -Y for 0.34; about 0.09 thick.
+- forearm_l / forearm_r: origin at the elbow; extends along -Y for 0.28; about 0.065 thick.
+- hand_l / hand_r: origin at the wrist; the hand extends along -Y for 0.17, palm facing the body. Fist/grip center at [0,-0.08,0.01]. A held object's handle passes through the grip along local Z (e.g. a sword: handle along Z, blade pointing +Z).
+- thigh_l / thigh_r: origin at the hip joint; extends along -Y for 0.44; about 0.12 thick.
+- shin_l / shin_r: origin at the knee; extends along -Y for 0.42; about 0.08 thick.
+- foot_l / foot_r: origin at the ankle; sole at y=-0.07; toes reach z=+0.19, heel z=-0.05; about 0.09 wide.
+"_l" is the character's left (outward = +X). For "_r", outward = -X: mirror x positions and y/z rotations for symmetrical parts.
+Clothing tips: a sleeve = cylinder on upperarm/forearm slightly thicker than the limb, centered half-way down it; pant legs on thigh/shin likewise; shirts and jackets on chest (+ spine, + hips for long ones); skirts and coat tails on hips; a cape on chest at z=-0.12 hanging down; hair and hats on head; shoes on feet.
+
+POSE: degrees per joint; omit joints that stay at 0. Joints: hips (rotates the whole body), spine, chest, neck, head, upperarm_l/_r (shoulder), forearm_l/_r (elbow), hand_l/_r (wrist), thigh_l/_r (hip joint), shin_l/_r (knee), foot_l/_r (ankle).
+ x: torso/neck/head: + bends forward. upperarm and thigh: + swings forward (90 = pointing straight ahead), - swings back. forearm: + bends the elbow (0-150). shin: + bends the knee (0-150). hand: + curls the wrist forward. foot: + points toes down.
+ y: twist; + turns toward the character's left.
+ z: torso: + leans to the character's left. upperarm and thigh: + raises the limb out to the side (upperarm z 90 = T-pose, 170 = straight up).
+ Left/right are mirrored for you: the same numbers on _l and _r give a symmetrical pose.
+ Optional top-level "lift" in pose: meters the body floats above the ground (jumping/flying). The body is otherwise auto-placed on the ground.
+ Relaxed stance: {"upperarm_l":{"z":8},"upperarm_r":{"z":8},"forearm_l":{"x":10},"forearm_r":{"x":10}}
+ Sitting on a chair: {"thigh_l":{"x":90},"thigh_r":{"x":90},"shin_l":{"x":90},"shin_r":{"x":90}}
+ If no pose is requested, give a neutral stance that suits the character.
+
+QUALITY: an artist draws from this, so silhouette, proportions and real-world scale matter most. Capture distinctive features (a car's wheels, windows and lights; a chair's legs; a building's windows and door; a creature's legs, tail and head shape). Use 10-80 parts. Round numbers to 3 decimals. Use plausible mid-tone colors.`;
+
+const round3 = (k, v) => typeof v === 'number' ? Math.round(v * 1000) / 1000 : v;
+const SIDES = `Careful with sides: when a figure faces the camera, the character's LEFT (_l) appears on the IMAGE's RIGHT.`;
+function refBlock(nImg, notes, copyPose, mode) {
+  if (!nImg && !notes.length) return '';
+  let s = '\n\nREFERENCE MATERIAL FROM THE USER:';
+  if (nImg) {
+    s += `\n${nImg} reference image${nImg > 1 ? 's are' : ' is'} attached (photos, drawings, sketches, screenshots or rendered pages).`;
+    if (mode === 'pose') return s;
+    s += ` Your job is to REPLICATE the subject as faithfully as primitives allow: match its silhouette, proportions, colors, materials and distinctive details, and estimate its real-world size from context.`;
+    if (nImg > 1) s += ` If the images show the same subject from different angles (front / side / back / turnaround sheet), combine them into one consistent 3D model. If they show different things, build the main subject and use the rest as detail or style reference.`;
+    s += ` For hidden sides, infer something sensible and consistent.`;
+    s += `\nIf the subject is a humanoid, make it a CHARACTER: set "body" (height, heads, build, shoulders, hips, bust, skin) to match the figure's proportions and art style (e.g. a chibi drawing gets ~3 heads), and model the outfit, hair and gear as parts on the right bones.`;
+    s += copyPose ? ` Copy the figure's POSE from the image into "pose", judging each joint: hips/whole-body lean, spine and chest bend and twist, head turn, each shoulder, elbow, wrist, hip, knee and ankle. ${SIDES}` : ` Use a neutral stance for "pose" (do not copy the image's pose).`;
+    s += `\nAnything else (object, vehicle, building, creature, weapon, environment piece) is a PROP: reproduce its shape faithfully with enough parts to read clearly.`;
+  }
+  for (const n of notes) s += `\n\nNOTES FROM THE FILE "${n.name}":\n${n.text}`;
+  return s;
+}
+function buildPrompt(q, kind, base, x = {}) {
+  const rb = refBlock(x.nImg || 0, x.notes || [], x.copyPose, x.poseOnly ? 'pose' : 'build');
+  if (x.poseOnly) return `${SPEC}${rb}\n\nTASK: This is an existing CHARACTER (JSON below). Look at the human figure in the reference image and work out its pose, joint by joint, in this app's pose convention (hips/whole-body lean, spine, chest, neck, head, both shoulders, elbows, wrists, hips, knees, ankles, plus "lift" if they are airborne). ${SIDES} Body: ${JSON.stringify(base.body || {}, round3)}\nReturn ONLY {"pose":{...}}.`;
+  if (base) return `${SPEC}${rb}\n\nCURRENT MODEL (JSON):\n${JSON.stringify(base, round3)}\n\nCHANGE REQUESTED: "${q}"${x.nImg ? ' Use the reference image(s) as visual guidance for the change.' : ''}\nReturn the COMPLETE updated model as JSON in the same format, keeping everything the change doesn't touch. JSON only.`;
+  return `${SPEC}${rb}\n\nREQUEST: ${q ? `"${q}"` : '(no text: build what the reference shows)'}\n${kind !== 'auto' ? `Build it as a ${kind.toUpperCase()}.` : 'Decide whether it is a CHARACTER (humanoid) or a PROP.'}\nReturn the JSON only.`;
+}
+function normPose(p) {
+  const pose = {};
+  for (const [k, v] of Object.entries(p || {})) {
+    if (k === 'lift') pose.lift = clamp(num(v), 0, 50);
+    else if (BONES.includes(k) && v && typeof v === 'object') pose[k] = { x: num(v.x), y: num(v.y), z: num(v.z) };
+  }
+  return pose;
+}
+function parseModel(text) {
+  let t = String(text || '').replace(/```(?:json)?/gi, '');
+  const a = t.indexOf('{'); if (a < 0) throw new Error('no json');
+  t = t.slice(a);
+  const b = t.lastIndexOf('}');
+  try { return JSON.parse(t.slice(0, b + 1)); } catch { }
+  // repair a truncated parts array
+  const pi = t.indexOf('"parts"');
+  if (pi >= 0) {
+    let cut = t.lastIndexOf('}', t.length);
+    while (cut > pi) {
+      const attempt = t.slice(0, cut + 1) + ']}';
+      try { return JSON.parse(attempt); } catch { }
+      cut = t.lastIndexOf('}', cut - 1);
+    }
+  }
+  throw new Error('bad json');
+}
+function normalize(def, kindPref) {
+  if (!def || typeof def !== 'object') throw new Error('empty');
+  const out = { kind: (def.kind === 'character' || (kindPref === 'character' && def.kind !== 'prop')) ? 'character' : 'prop', name: String(def.name || 'Model').slice(0, 60) };
+  const parts = Array.isArray(def.parts) ? def.parts : [];
+  out.parts = parts.filter(p => p && typeof p === 'object' && Array.isArray(p.size)).slice(0, 220).map(p => {
+    const q = { shape: String(p.shape || 'box'), size: p.size.slice(0, 3).map(v => num(v, 0.05)), pos: (Array.isArray(p.pos) ? p.pos : [0, 0, 0]).slice(0, 3).map(v => num(v)), color: normColor(p.color) };
+    if (Array.isArray(p.rot)) q.rot = p.rot.slice(0, 3).map(v => num(v));
+    for (const k of ['taper', 'arc', 'opacity']) if (p[k] != null) q[k] = num(p[k], 1);
+    if (p.metal) q.metal = true; if (p.name) q.name = String(p.name).slice(0, 40);
+    if (out.kind === 'character') q.bone = BONES.includes(p.bone) ? p.bone : 'chest';
+    return q;
+  });
+  if (out.kind === 'character') {
+    out.body = { ...BODY_DEFAULT, ...(def.body || {}) };
+    out.pose = normPose(def.pose);
+  } else if (!out.parts.length) throw new Error('no parts');
+  return out;
+}
+async function generate(q, kindPref, base = null, x = {}) {
+  if (!aiReady()) {
+    if (base) { setStatus('Changing a model with words needs an AI engine. Pick one under “AI engine”.', 'err'); return null; }
+    return null;
+  }
+  const images = x.useRefs ? refImages().map(r => r.blob) : [];
+  const notes = x.useRefs ? refs.filter(r => r.kind === 'text') : [];
+  lastErr = null;
+  busy = new AbortController();
+  const quality = $('#qualSeg .on').dataset.v;
+  const what = q ? `“${q}”` : 'your reference';
+  setStatus(x.poseOnly ? 'Reading the pose from your reference…' : (base ? 'Reworking with ' : 'Modeling ') + what + (images.length && !x.poseOnly ? ` from ${images.length} image${images.length > 1 ? 's' : ''}` : '') + '…', 'busy');
+  const t0 = performance.now();
+  try {
+    const opts = {
+      signal: busy.signal, quality, images, nocache: !!base,
+      onText: ({ text }) => { const n = (text.match(/"shape"/g) || []).length; setStatus(x.poseOnly ? 'Posing…' : n ? `Placing parts… ${n}` : 'Thinking about shapes…', 'busy'); }
+    };
+    if (aiCfg.provider !== 'claude') setStatus('Waiting for ' + PROVIDERS[aiCfg.provider].split(':')[0] + '… (local models can take a few minutes)', 'busy');
+    const prompt = buildPrompt(q, kindPref, base, { nImg: images.length, notes, copyPose: $('#copyPose').checked, poseOnly: x.poseOnly });
+    const res = { text: await aiCall(prompt, opts) };
+    if (x.poseOnly) { const j = parseModel(res.text); const pose = normPose(j.pose || j); if (!Object.keys(pose).length) throw new Error('no pose'); return { pose }; }
+    const def = normalize(parseModel(res.text), kindPref);
+    setStatus(`Built “${def.name}” from ${def.parts.length} parts in ${((performance.now() - t0) / 1000).toFixed(0)}s.`);
+    return def;
+  } catch (e) {
+    lastErr = (e && (e.code || e.message)) || 'error';
+    console.warn('[Perspective Puppet] AI build failed:', e);
+    if (e && ['sampling_disabled', 'not_declared', 'capability_disabled', 'capability_removed'].includes(e.code)) { sampleFn = null; aiState = 'lib'; updateBadge(); updateRefHint(); setStatus('AI modeling isn’t available for this account or view.', 'err'); return null; }
+    if (e && e.code === 'not_granted') { sampleFn = null; renderAiBox(); aiState = 'lib'; updateBadge(); setStatus('AI modeling wasn’t allowed, so I’ll use the built-in library.', 'err'); return null; }
+    if (e && e.code === 'rate_limited') { setStatus('AI is busy right now — try again in a minute.', 'err'); return null; }
+    if (e && (e.name === 'AbortError' || e.code === 'aborted' || e.code === 'cancelled')) { setStatus('Cancelled.'); return null; }
+    if (e && e.code === 'image_rejected') { setStatus('One of the images couldn’t be read. Try a different file or a screenshot of it.', 'err'); return null; }
+    if (e && e.code === 'images_unavailable') { imgLimits = null; aiImages = false; updateRefHint(); setStatus('This view can’t send images to the AI.', 'err'); return null; }
+    if (e && e.code === 'refused') { setStatus('Claude declined that request. Try a different reference or wording.', 'err'); return null; }
+    if (e && e.code === 'session_expired') { setStatus('Your Claude sign-in expired. Reload the page and sign in again.', 'err'); return null; }
+    if (e && e.code === 'unreachable') { setStatus(e.message + (aiCfg.provider === 'ollama' ? '. Is Ollama running? Open AI engine settings and click Test.' : '. Check the URL and your internet connection.'), 'err'); return null; }
+    if (e && e.code === 'key_rejected') { setStatus('The API key was rejected. Check it in AI engine settings.', 'err'); return null; }
+    if (e && e.code === 'free_limit_reached') { setStatus('You’ve hit the free usage limit for now. Wait a bit (Gemini resets daily) or switch engines.', 'err'); return null; }
+    if (e && (e.code === 'model_not_found' || e.code === 'no_model' || e.code === 'no_api_key')) { setStatus((e.code === 'model_not_found' ? 'That model isn’t installed or doesn’t exist. ' + (aiCfg.provider === 'ollama' ? `Run: ollama pull ${aiCfg.ollama.model}` : 'Check the model name.') : e.message), 'err'); return null; }
+    if (e && (e.code === 'no_credit' || e.code === 'overloaded' || e.code === 'api_error')) { setStatus(e.message, 'err'); return null; }
+    if (e && e.code === 'ollama_error') { setStatus('Ollama: ' + e.message, 'err'); return null; }
+    setStatus(`Couldn’t build that one (${lastErr}). Try rewording it, or switch to Detailed.`, 'err'); return null;
+  } finally { busy = null; }
+}
+
+/* ================= built-in library (works offline) ================= */
+const Bx = (size, pos, color, x = {}) => ({ shape: 'box', size, pos, color, ...x });
+const Cy = (size, pos, color, x = {}) => ({ shape: 'cylinder', size, pos, color, ...x });
+const Sp = (size, pos, color, x = {}) => ({ shape: 'sphere', size, pos, color, ...x });
+const WD = '#8a5a35', DK = '#3a3f4a';
+function rng(seed) { return () => (seed = (seed * 16807) % 2147483647) / 2147483647; }
+const LIB = [
+  { k: ['chair', 'stool', 'seat'], n: 'Chair', p: () => { const a = [Bx([.46, .05, .46], [0, .45, 0], WD)]; for (const x of [-.2, .2]) for (const z of [-.2, .2]) a.push(Bx([.04, .45, .04], [x, .225, z], WD)); for (const x of [-.2, .2]) a.push(Bx([.04, .5, .04], [x, .72, -.21], WD)); a.push(Bx([.44, .08, .03], [0, .74, -.21], WD), Bx([.44, .08, .03], [0, .9, -.21], WD)); return a; } },
+  { k: ['table', 'dining'], n: 'Table', p: () => { const a = [Bx([1.4, .05, .8], [0, .745, 0], WD)]; for (const x of [-.63, .63]) for (const z of [-.33, .33]) a.push(Bx([.06, .72, .06], [x, .36, z], WD)); return a; } },
+  { k: ['desk', 'office'], n: 'Desk', p: () => { const a = [Bx([1.4, .04, .7], [0, .74, 0], '#c9b59a'), Bx([.42, .7, .66], [-.47, .36, 0], '#7c838e')]; for (const y of [.15, .38, .6]) a.push(Bx([.38, .19, .01], [-.47, y, .335], '#8d949f'), Bx([.1, .02, .02], [-.47, y + .03, .345], '#333', { metal: true })); a.push(Bx([.05, .72, .05], [.65, .36, .3], '#7c838e'), Bx([.05, .72, .05], [.65, .36, -.3], '#7c838e'), Bx([.55, .34, .03], [.15, 1.0, -.2], '#1d2026'), Bx([.08, .17, .06], [.15, .84, -.22], '#1d2026'), Bx([.44, .02, .14], [.15, .77, .08], '#2a2d33')); return a; } },
+  { k: ['sofa', 'couch'], n: 'Sofa', p: () => { const c = '#6b7a8f'; return [Bx([2, .3, .9], [0, .25, 0], c), Bx([2, .5, .22], [0, .62, -.34], c), Bx([.22, .62, .9], [-.89, .41, 0], c), Bx([.22, .62, .9], [.89, .41, 0], c), Bx([.76, .14, .66], [-.39, .47, .08], '#7d8ca3'), Bx([.76, .14, .66], [.39, .47, .08], '#7d8ca3'), ...[[-.9, .4], [.9, .4], [-.9, -.4], [.9, -.4]].map(([x, z]) => Cy([.05, .1, .05], [x, .05, z], '#222'))]; } },
+  { k: ['bed', 'bedroom'], n: 'Bed', p: () => [Bx([1.6, .28, 2.1], [0, .24, 0], WD), Bx([1.5, .22, 2], [0, .49, 0], '#e8e4dc'), Bx([1.6, 1.05, .08], [0, .52, -1.05], WD), Bx([.6, .12, .35], [-.37, .66, -.75], '#ffffff'), Bx([.6, .12, .35], [.37, .66, -.75], '#ffffff'), Bx([1.54, .06, 1.25], [0, .62, .38], '#7d8fb3')] },
+  { k: ['door', 'doorway'], n: 'Door', p: () => [Bx([.08, 2.15, .14], [-.49, 1.075, 0], '#ddd6cb'), Bx([.08, 2.15, .14], [.49, 1.075, 0], '#ddd6cb'), Bx([1.06, .08, .14], [0, 2.19, 0], '#ddd6cb'), Bx([.9, 2.1, .045], [0, 1.05, 0], '#a8744a'), Bx([.3, .7, .012], [-.2, 1.5, .028], '#96653f'), Bx([.3, .7, .012], [.2, 1.5, .028], '#96653f'), Bx([.3, .7, .012], [-.2, .6, .028], '#96653f'), Bx([.3, .7, .012], [.2, .6, .028], '#96653f'), Sp([.06, .06, .06], [.36, 1.0, .06], '#c9a227', { metal: true })] },
+  { k: ['car', 'sedan', 'vehicle', 'auto', 'automobile'], n: 'Car', p: () => { const r = '#b0322b', a = [Bx([1.8, .55, 4.4], [0, .62, 0], r), Bx([1.6, .5, 2.2], [0, 1.12, -.25], r), Bx([1.62, .36, 1.9], [0, 1.13, -.25], '#26323d'), Bx([1.4, .36, .05], [0, 1.08, .87], '#26323d', { rot: [-28, 0, 0] }), Bx([1.84, .14, .14], [0, .42, 2.2], '#333'), Bx([1.84, .14, .14], [0, .42, -2.2], '#333')]; for (const x of [-.82, .82]) for (const z of [-1.35, 1.35]) a.push(Cy([.66, .24, .66], [x, .33, z], '#1d1d1f', { rot: [0, 0, 90] }), Cy([.36, .25, .36], [x, .33, z], '#bbbbbb', { rot: [0, 0, 90], metal: true })); for (const x of [-.6, .6]) a.push(Bx([.3, .12, .04], [x, .72, 2.2], '#fff6c8'), Bx([.3, .1, .04], [x, .74, -2.2], '#ff3030')); return a; } },
+  { k: ['streetlight', 'street light', 'lamp post', 'lamppost', 'streetlamp', 'street lamp'], n: 'Street lamp', p: () => [Cy([.32, .3, .32], [0, .15, 0], DK), Cy([.12, 4.2, .12], [0, 2.4, 0], DK, { taper: .7 }), Bx([.06, .06, 1.0], [0, 4.45, .45], DK), Bx([.3, .12, .5], [0, 4.42, .95], DK), Bx([.24, .03, .4], [0, 4.35, .95], '#fff6c8')] },
+  { k: ['bookshelf', 'bookcase', 'shelf', 'books'], n: 'Bookshelf', p: () => { const a = [Bx([.03, 1.8, .32], [-.435, .9, 0], WD), Bx([.03, 1.8, .32], [.435, .9, 0], WD), Bx([.9, 1.8, .02], [0, .9, -.15], '#6f4628')]; for (const y of [.02, .45, .9, 1.35, 1.78]) a.push(Bx([.84, .03, .3], [0, y, 0], WD)); const R = rng(7), cols = ['#7a2e2e', '#2e4f7a', '#3d6b3a', '#b08a3e', '#5a3d6b', '#2b2b2b', '#a55a32']; for (const y of [.035, .465, .915, 1.365]) { let x = -.41; while (x < .38) { const w = .025 + R() * .03, h = .2 + R() * .17; a.push(Bx([w, h, .21], [x + w / 2, y + h / 2, .02], cols[Math.floor(R() * cols.length)])); x += w + .004; if (R() < .08) x += .06; } } return a; } },
+  { k: ['mug', 'cup', 'coffee'], n: 'Mug', p: () => [Cy([.085, .1, .085], [0, .05, 0], '#e5e1d6'), { shape: 'torus', size: [.065, .065, .014], pos: [.05, .052, 0], color: '#e5e1d6' }, Cy([.07, .005, .07], [0, .09, 0], '#3b2416')] },
+  { k: ['bottle', 'wine'], n: 'Bottle', p: () => [Cy([.075, .2, .075], [0, .1, 0], '#2f7d4a', { opacity: .75 }), Cy([.075, .05, .075], [0, .225, 0], '#2f7d4a', { taper: .38, opacity: .75 }), Cy([.028, .08, .028], [0, .29, 0], '#2f7d4a', { opacity: .75 }), Cy([.031, .02, .031], [0, .335, 0], '#c9a227')] },
+  { k: ['sword', 'katana', 'blade', 'longsword'], n: 'Sword', p: () => [Bx([.05, .8, .008], [0, .98, 0], '#cfd5dc', { metal: true }), { shape: 'cone', size: [.05, .09, .008], pos: [0, 1.425, 0], color: '#cfd5dc', metal: true }, Bx([.22, .03, .04], [0, .565, 0], '#a9894b', { metal: true }), Cy([.032, .17, .032], [0, .465, 0], '#4a2f22'), Sp([.05, .05, .05], [0, .37, 0], '#a9894b', { metal: true })] },
+  { k: ['stairs', 'staircase', 'steps', 'stair'], n: 'Staircase', p: () => { const a = []; for (let i = 0; i < 12; i++) a.push(Bx([1.2, .18 * (i + 1), .28], [0, .09 * (i + 1), -i * .28], i % 2 ? '#bdb5a8' : '#c8c0b3')); for (const x of [-.6, .6]) { for (let i = 0; i < 12; i += 3) a.push(Bx([.04, .9, .04], [x, .18 * (i + 1) + .45, -i * .28], DK)); a.push(Bx([.05, .05, 3.7], [x, 1.08 + 1.0, -1.54], DK, { rot: [32.7, 0, 0] })); } return a; } },
+  { k: ['house', 'home', 'cottage'], n: 'House', p: () => [Bx([6, 3, 5], [0, 1.5, 0], '#d9cfbf'), Bx([6.5, .15, 3.4], [0, 3.88, 1.25], '#7a3b2e', { rot: [35, 0, 0] }), Bx([6.5, .15, 3.4], [0, 3.88, -1.25], '#7a3b2e', { rot: [-35, 0, 0] }), { shape: 'wedge', size: [6, 1.75, 2.5], pos: [0, 3.875, 1.25], color: '#d9cfbf' }, { shape: 'wedge', size: [6, 1.75, 2.5], pos: [0, 3.875, -1.25], rot: [0, 180, 0], color: '#d9cfbf' }, Bx([1, 2.1, .06], [0, 1.05, 2.51], '#6b3f26'), Bx([1.1, 1.1, .06], [-1.8, 1.7, 2.51], '#9cc3d9'), Bx([1.1, 1.1, .06], [1.8, 1.7, 2.51], '#9cc3d9'), Bx([.5, 1.6, .5], [1.8, 4.3, -1], '#8c5a48'), Bx([1.4, .15, .8], [0, .075, 2.9], '#a9a39a')] },
+  { k: ['tree', 'oak'], n: 'Tree', p: () => [Cy([.32, 2.4, .32], [0, 1.2, 0], '#6b4a2f', { taper: .65 }), Sp([2.2, 1.9, 2.2], [0, 3, 0], '#4f7d3a'), Sp([1.5, 1.4, 1.5], [.55, 3.6, .3], '#5b8a44'), Sp([1.4, 1.3, 1.4], [-.55, 3.5, -.35], '#466f33'), Sp([1.2, 1.1, 1.2], [0, 4.1, 0], '#5b8a44')] },
+  { k: ['crate', 'box', 'chest'], n: 'Crate', p: () => { const a = [Bx([.8, .8, .8], [0, .4, 0], '#b08850')]; for (const y of [.05, .75]) a.push(Bx([.82, .1, .82], [0, y, 0], '#8f6b3c')); for (const x of [-.36, .36]) for (const z of [-.36, .36]) a.push(Bx([.1, .8, .1], [x, .4, z], '#8f6b3c')); return a; } },
+  { k: ['barrel', 'keg'], n: 'Barrel', p: () => [Cy([.52, .45, .52], [0, .225, 0], WD, { taper: 1.2 }), Cy([.624, .45, .624], [0, .675, 0], WD, { taper: 1 / 1.2 }), ...[[.12, .58], [.45, .64], [.78, .58]].map(([y, d]) => ({ shape: 'torus', size: [d, d, .03], pos: [0, y, 0], rot: [90, 0, 0], color: '#444', metal: true }))] },
+  { k: ['laptop', 'computer', 'notebook'], n: 'Laptop', p: () => [Bx([.34, .02, .24], [0, .01, 0], '#9aa0a8', { metal: true }), Bx([.3, .003, .1], [0, .021, .02], '#333'), Bx([.34, .22, .008], [0, .125, -.15], '#9aa0a8', { rot: [-15, 0, 0], metal: true }), Bx([.31, .19, .002], [0, .125, -.144], '#1b2430', { rot: [-15, 0, 0] })] },
+  { k: ['phone', 'smartphone', 'cellphone', 'mobile'], n: 'Phone', p: () => [Bx([.075, .155, .008], [0, .0775, 0], '#222', { rot: [-12, 0, 0] }), Bx([.068, .145, .002], [0, .078, .005], '#30425c', { rot: [-12, 0, 0] })] },
+  { k: ['bench', 'park bench'], n: 'Bench', p: () => { const a = []; for (const z of [-.15, -.05, .05, .15]) a.push(Bx([1.6, .03, .08], [0, .45, z], WD)); for (const y of [.62, .74, .86]) a.push(Bx([1.6, .08, .03], [0, y, -.22], WD, { rot: [-10, 0, 0] })); for (const x of [-.7, .7]) a.push(Bx([.05, .45, .45], [x, .225, 0], DK), Bx([.05, .5, .05], [x, .7, -.23], DK)); return a; } },
+  { k: ['hydrant', 'fire hydrant'], n: 'Fire hydrant', p: () => { const c = '#c8312b'; return [Cy([.3, .06, .3], [0, .03, 0], c), Cy([.22, .55, .22], [0, .335, 0], c), { shape: 'hemisphere', size: [.24, .12, .24], pos: [0, .61, 0], color: c }, Cy([.05, .06, .05], [0, .75, 0], c), Cy([.1, .2, .1], [0, .45, 0], c, { rot: [0, 0, 90] }), Cy([.12, .14, .12], [0, .45, .1], c, { rot: [90, 0, 0] })]; } },
+  { k: ['trash', 'bin', 'garbage', 'trash can'], n: 'Trash can', p: () => [Cy([.48, .85, .48], [0, .425, 0], '#5f6b5c', { taper: 1.12 }), Cy([.56, .06, .56], [0, .88, 0], '#4e584c'), Bx([.16, .03, .04], [0, .93, 0], '#4e584c')] },
+  { k: ['building', 'skyscraper', 'tower', 'apartment', 'city'], n: 'Building', p: () => { const a = [Bx([12, 30, 12], [0, 15, 0], '#bfb8ad')]; for (let i = 1; i < 10; i++) a.push(Bx([12.06, .9, 12.06], [0, i * 3 + .2, 0], '#4a5a6a')); a.push(Bx([12.3, .6, 12.3], [0, 30.3, 0], '#a59e93'), Bx([3, 3, .1], [0, 1.5, 6.02], '#33404d'), Bx([3, 2, 2], [-3, 31.6, -2], '#8f897f')); return a; } },
+  { k: ['motorcycle', 'motorbike', 'bike', 'bicycle'], n: 'Motorcycle', p: () => [Cy([.62, .14, .62], [0, .31, .72], '#1d1d1f', { rot: [0, 0, 90] }), Cy([.62, .16, .62], [0, .31, -.68], '#1d1d1f', { rot: [0, 0, 90] }), Bx([.26, .3, .7], [0, .55, 0], '#3a3f4a', { metal: true }), Bx([.3, .2, .5], [0, .78, .2], '#1d4fa3'), Bx([.28, .1, .5], [0, .84, -.25], '#222'), Cy([.05, .6, .05], [0, .6, .62], '#999', { rot: [-25, 0, 0], metal: true }), Cy([.04, .7, .04], [0, .92, .5], '#999', { rot: [0, 0, 90], metal: true }), Sp([.16, .16, .1], [0, .85, .66], '#fff6c8')] },
+  { k: ['gun', 'pistol', 'handgun'], n: 'Pistol', p: () => [Bx([.03, .035, .19], [0, .14, .03], '#2a2c30', { metal: true }), Bx([.028, .11, .045], [0, .07, -.04], '#2a2c30', { rot: [-15, 0, 0] }), { shape: 'torus', size: [.04, .04, .006], pos: [0, .105, .01], color: '#2a2c30' }] },
+];
+const CHAR_RE = /\b(man|men|woman|women|person|people|guy|girl|boy|kid|child|hero|heroine|villain|knight|soldier|ninja|samurai|wizard|witch|robot|android|zombie|character|mannequin|figure|human|lady|cop|police|officer|detective|chef|doctor|nurse|pirate|cowboy|elf|warrior|student|teen|teenager|old|elder|elderly|baby|chibi|superhero|princess|prince|king|queen|thief|assassin|astronaut|athlete|dancer|businessman|businesswoman|monk|vampire|alien|cyborg|mage|archer|giant|ogre|dwarf|orc)\b/i;
+function libraryLookup(q, kindPref) {
+  const s = q.toLowerCase();
+  if (kindPref !== 'prop' && (kindPref === 'character' || CHAR_RE.test(s))) {
+    let body = { ...BODY_PRESETS['Average man'] }; const pose = JSON.parse(JSON.stringify(POSES.Stand));
+    if (/woman|women|girl|lady|princess|queen|witch|heroine|nurse|businesswoman/.test(s)) body = { ...BODY_PRESETS['Average woman'] };
+    if (/hero|superhero|warrior|knight|soldier/.test(s)) Object.assign(body, BODY_PRESETS.Heroic, body.bust ? { bust: .55, hips: 1.1, shoulders: 1.05 } : {});
+    if (/teen/.test(s)) Object.assign(body, BODY_PRESETS.Teen);
+    if (/child|kid|boy\b|baby/.test(s)) Object.assign(body, BODY_PRESETS.Child);
+    if (/chibi/.test(s)) Object.assign(body, BODY_PRESETS.Chibi);
+    if (/giant|brute|ogre|orc|hulk/.test(s)) Object.assign(body, BODY_PRESETS.Brute);
+    if (/dwarf/.test(s)) Object.assign(body, { height: 1.3, heads: 5, build: 1.4 });
+    if (/old|elder/.test(s)) { pose.spine = { x: 12 }; pose.neck = { x: 10 }; pose.head = { x: -12 }; pose.shin_l = { x: 8 }; pose.shin_r = { x: 8 }; }
+    return { kind: 'character', name: q.replace(/\b\w/g, c => c.toUpperCase()).slice(0, 40), body, pose, parts: [] };
+  }
+  let best = null, bestLen = 0;
+  for (const e of LIB) for (const kw of e.k) if (s.includes(kw) && kw.length > bestLen) { best = e; bestLen = kw.length; }
+  if (!best) return null;
+  return { kind: 'prop', name: best.n, parts: best.p() };
+}
+
+/* ================= search UI ================= */
+const SUGGEST = ['samurai with katana', 'detective in trench coat', 'chibi witch', 'muscular superhero', 'office chair', 'vintage car', 'street lamp', 'motorcycle', 'city apartment building', 'staircase', 'wooden barrel', 'dragon'];
+$('#chips').innerHTML = SUGGEST.map(s => `<button class="chip" type="button">${s}</button>`).join('');
+$('#chips').addEventListener('click', e => { const c = e.target.closest('.chip'); if (c) { $('#q').value = c.textContent; runSearch(); } });
+function segBind(id, cb) { $(id).addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; $(id).querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); cb && cb(b.dataset.v); }); }
+segBind('#kindSeg'); segBind('#qualSeg');
+segBind('#guideSeg', v => guides = v);
+segBind('#modeSeg', v => setMode(v));
+$('#searchForm').addEventListener('submit', e => { e.preventDefault(); runSearch(); });
+async function runSearch() {
+  const q = $('#q').value.trim();
+  if (!q && !refs.length) { setStatus('Type something to build, or add a reference image.', 'err'); return; }
+  if (busy) { setStatus('Still working on the last build. Press Cancel to stop it, then try again.', 'busy'); return; }
+  lastErr = null;
+  const kind = $('#kindSeg .on').dataset.v;
+  const imgs = refImages();
+  $('#goBtn').disabled = true;
+  try {
+    // No-AI path: build a 3D shape straight from the reference images
+    if (imgs.length && effectiveRefMode() === 'shape') { await buildShapeFromRefs(q); return; }
+    if (!q && !aiReady()) { setStatus('Text notes alone need an AI engine. Add an image and use “Shape from image”, or pick an AI engine.', 'err'); return; }
+    let def = null;
+    if (aiReady()) def = await generate(q, kind, null, { useRefs: refs.length > 0 });
+    if (!def && imgs.length && lastErr !== 'cancelled' && lastErr !== 'aborted') {
+      const why = lastErr; await buildShapeFromRefs(q, `The AI build didn’t work (${why}), so I built a shape straight from your image instead.`); return;
+    }
+    if (!def && q) {
+      const lib = libraryLookup(q, kind);
+      if (lib) { def = lib; setStatus((lastErr && aiReady() ? `AI build failed (${lastErr}), so I used the built-in ` : aiReady() ? 'Used the built-in ' : 'From the built-in library: ') + lib.name + (lib.kind === 'character' ? ' mannequin' : '') + '.', lastErr ? 'err' : ''); }
+      else if (!aiReady()) { setStatus(`“${q}” isn’t in the built-in library (AI is off here). Try: ${LIB.map(e => e.k[0]).join(', ')}, or any kind of person. Or add a picture of it and use “Shape from image”.`, 'err'); }
+    }
+    if (def) {
+      const o = addObject(def); remember(q || def.name, def);
+      setTimeout(() => viewPreset('threeq'), 30);
+      if (mobile) closeSheet();
+      if (o.kind === 'character' && mode !== 'pose') setMode('pose');
+    }
+  } finally { $('#goBtn').disabled = false; }
+}
+/* recent cache */
+const LS = { get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { } } };
+let recent = LS.get('pp3d.recent', []);
+function remember(q, def) {
+  if (!def.parts || (!def.parts.length && def.kind !== 'character')) return;
+  recent = [{ q, def }, ...recent.filter(r => r.q.toLowerCase() !== q.toLowerCase())].slice(0, 14);
+  LS.set('pp3d.recent', recent); renderRecent();
+}
+function renderRecent() {
+  const el = $('#recent');
+  el.innerHTML = recent.length ? '<div style="width:100%;font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.1em">Recent (instant)</div>' : '';
+  recent.forEach((r, i) => { const b = document.createElement('button'); b.className = 'chip'; b.style.borderStyle = 'dashed'; b.textContent = r.def.name || r.q; b.title = r.q; b.onclick = () => { addObject(r.def); setTimeout(() => viewPreset('threeq'), 30); }; el.appendChild(b); });
+}
+renderRecent();
+$('#addMan').onclick = () => { addObject({ kind: 'character', name: 'Mannequin', body: { ...BODY_DEFAULT }, pose: POSES.Stand, parts: [] }); setMode('pose'); };
+
+/* ================= reference files ================= */
+let refs = []; // {kind:'image', blob, url, name} | {kind:'text', name, text}
+const refImages = () => refs.filter(r => r.kind === 'image');
+function nextRole() { const used = new Set(refImages().map(r => r.role)); return ['front', 'side', 'back'].find(r => !used.has(r)) || 'skip'; }
+const IMG_EXT = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'avif', 'svg', 'heic', 'heif', 'tif', 'tiff'];
+const TXT_EXT = ['txt', 'md', 'json', 'csv'];
+const MODEL_EXT = ['glb', 'gltf', 'obj', 'stl', 'fbx', 'ply'];
+const extOf = f => (f.name || '').split('.').pop().toLowerCase();
+function updateRefHint() {
+  const h = $('#refHint');
+  if (aiState === 'lib' || (aiState === 'ai' && !imgLimits)) {
+    h.textContent = aiState === 'lib'
+      ? 'AI is off in this view, so images become 3D with “Shape from image” (no AI needed). 3D files (.glb .obj .stl .fbx .ply) load straight into the scene.'
+      : 'This view can’t send images to the AI, so images become 3D with “Shape from image” (no AI needed). 3D files load straight into the scene.';
+  }
+  if (sel) renderInspector();
+}
+const ROLES = ['front', 'side', 'side-flip', 'back', 'skip'], ROLE_LABEL = { front: 'Front', side: 'Side ←', 'side-flip': 'Side →', back: 'Back', skip: 'Skip' };
+let refMode = 'ai';
+const aiCanUseImages = () => aiCfg.provider === 'claude' ? (!!sampleFn && aiImages) : aiReady();
+function effectiveRefMode() { return refImages().length && (refMode === 'shape' || !aiCanUseImages()) ? 'shape' : 'ai'; }
+function renderTray() {
+  const t = $('#tray'); t.innerHTML = '';
+  refs.forEach((r, i) => {
+    const d = document.createElement('div'); d.className = 'thumb' + (r.kind === 'text' ? ' note' : ''); d.title = r.name;
+    if (r.kind === 'image') {
+      const img = document.createElement('img'); img.src = r.url; d.appendChild(img);
+      const role = document.createElement('div'); role.className = 'role' + (r.role === 'skip' ? ' skip' : ''); role.textContent = ROLE_LABEL[r.role] || 'Front';
+      role.title = 'Click to change what this image shows (used by "Shape from image")';
+      role.onclick = () => { r.role = ROLES[(ROLES.indexOf(r.role) + 1) % ROLES.length]; renderTray(); };
+      d.appendChild(role);
+    } else d.textContent = '📄 ' + r.name.slice(0, 22);
+    const x = document.createElement('button'); x.textContent = '✕'; x.title = 'Remove';
+    x.onclick = () => { if (r.url) URL.revokeObjectURL(r.url); refs.splice(i, 1); renderTray(); };
+    d.appendChild(x); t.appendChild(d);
+  });
+  const hasImg = refImages().length > 0;
+  $('#refOpts').style.display = hasImg ? '' : 'none';
+  const aiBtn = $('#refMode [data-v=ai]'); aiBtn.disabled = !aiCanUseImages();
+  aiBtn.title = aiCanUseImages() ? 'Claude models it from your images' : 'AI modeling from images isn’t available in this view';
+  const m = effectiveRefMode();
+  $('#refMode').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === m));
+  $('#shapeOpts').style.display = $('#shapeHint').style.display = m === 'shape' && hasImg ? '' : 'none';
+  updateGoLabel();
+  if (sel) renderInspector();
+  renderLibBadge();
+}
+function updateGoLabel() { $('#goBtn').textContent = refImages().length && effectiveRefMode() === 'shape' ? 'Build shape' : (refs.length && !$('#q').value.trim() ? 'Build from ref' : 'Build'); }
+$('#refMode').addEventListener('click', e => { const b = e.target.closest('button'); if (!b || b.disabled) return; refMode = b.dataset.v; renderTray(); });
+$('#q').addEventListener('input', updateGoLabel);
+async function toPng(blob, maxSide = 2000) {
+  let src;
+  try { src = await createImageBitmap(blob); }
+  catch { src = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = URL.createObjectURL(blob); }); }
+  const w = src.width || src.naturalWidth, h = src.height || src.naturalHeight, s = Math.min(1, maxSide / Math.max(w, h));
+  const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w * s)); c.height = Math.max(1, Math.round(h * s));
+  const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(src, 0, 0, c.width, c.height);
+  return await new Promise(r => c.toBlob(r, 'image/jpeg', 0.9));
+}
+async function addImageRef(blob, name) {
+  const max = imgLimits ? imgLimits.maxCount : 4;
+  if (refImages().length >= max) { setStatus(`You can use up to ${max} reference images at once.`, 'err'); return; }
+  let b = blob;
+  const okType = imgLimits ? imgLimits.mediaTypes.includes(b.type) : /image\/(jpeg|png|webp|gif)/.test(b.type);
+  const tooBig = imgLimits ? b.size > imgLimits.maxInputBytes : b.size > 15e6;
+  if (!okType || tooBig || b.size > 6e6) {
+    try { b = await toPng(b); } catch { setStatus(`Couldn’t read “${name}” as an image. Try a PNG or JPEG.`, 'err'); return; }
+  }
+  refs.push({ kind: 'image', blob: b, url: URL.createObjectURL(b), name, role: nextRole() }); renderTray();
+}
+let pdfjsP = null;
+function loadPdfJs() {
+  if (pdfjsP) return pdfjsP;
+  pdfjsP = new Promise((res, rej) => {
+    const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    s.onload = () => { try { window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; res(window.pdfjsLib); } catch (e) { rej(e); } };
+    s.onerror = rej; document.head.appendChild(s);
+  });
+  return pdfjsP;
+}
+async function addPdf(file) {
+  setStatus(`Reading “${file.name}”…`, '');
+  try {
+    const lib = await loadPdfJs();
+    const pdf = await lib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+    const room = (imgLimits ? imgLimits.maxCount : 4) - refImages().length;
+    const n = Math.min(pdf.numPages, Math.max(room, 0), 4);
+    let text = '';
+    for (let i = 1; i <= Math.min(pdf.numPages, 6); i++) {
+      const pg = await pdf.getPage(i);
+      try { const tc = await pg.getTextContent(); text += tc.items.map(t => t.str).join(' ') + '\n'; } catch { }
+      if (i <= n) {
+        const v0 = pg.getViewport({ scale: 1 }), sc = 1600 / Math.max(v0.width, v0.height), vp = pg.getViewport({ scale: sc });
+        const c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height;
+        const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+        await pg.render({ canvasContext: g, viewport: vp }).promise;
+        const b = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.88));
+        refs.push({ kind: 'image', blob: b, url: URL.createObjectURL(b), name: `${file.name} p${i}`, role: nextRole() });
+      }
+    }
+    text = text.replace(/\s+\n/g, '\n').trim();
+    if (text.length > 40) refs.push({ kind: 'text', name: file.name, text: text.slice(0, 8000) });
+    renderTray();
+    setStatus(`Added ${n} page${n === 1 ? '' : 's'} from “${file.name}”${pdf.numPages > n ? ` (of ${pdf.numPages})` : ''}.`);
+  } catch { setStatus(`Couldn’t open “${file.name}”. Try a screenshot of the page instead.`, 'err'); }
+}
+async function addFiles(list) {
+  for (const f of list) {
+    const ext = extOf(f);
+    if (MODEL_EXT.includes(ext)) { await importModel(f); continue; }
+    if ((f.type || '').startsWith('image/') || IMG_EXT.includes(ext)) { await addImageRef(f, f.name || 'pasted image'); continue; }
+    if (f.type === 'application/pdf' || ext === 'pdf') { await addPdf(f); continue; }
+    if (ext === 'json') {
+      let j = null; try { j = JSON.parse(await f.text()); } catch { }
+      if (j && j.app === 'perspective-puppet') { try { await importLibraryJson(j, f.name.replace(/\..*$/, '')); } catch { setStatus(`\u201c${f.name}\u201d couldn\u2019t be opened.`, 'err'); } continue; }
+    }
+    if ((f.type || '').startsWith('text/') || TXT_EXT.includes(ext)) {
+      const text = (await f.text()).slice(0, 12000);
+      refs.push({ kind: 'text', name: f.name, text }); renderTray(); continue;
+    }
+    setStatus(`“${f.name}” isn’t a file type I can use. Try an image, PDF, text notes, or a .glb/.obj/.stl/.fbx model.`, 'err');
+  }
+}
+$('#refBtn').onclick = () => $('#refFile').click();
+$('#refFile').onchange = e => { addFiles([...e.target.files]); e.target.value = ''; };
+let dragDepth = 0;
+addEventListener('dragenter', e => { if ([...(e.dataTransfer?.types || [])].includes('Files')) { dragDepth++; document.body.classList.add('dragging'); } });
+addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; document.body.classList.remove('dragging'); } });
+addEventListener('dragover', e => { if ([...(e.dataTransfer?.types || [])].includes('Files')) e.preventDefault(); });
+addEventListener('drop', e => {
+  dragDepth = 0; document.body.classList.remove('dragging');
+  const files = [...(e.dataTransfer?.files || [])]; if (!files.length) return;
+  e.preventDefault(); addFiles(files);
+});
+addEventListener('paste', e => {
+  const files = [...(e.clipboardData?.files || [])]; if (!files.length) return;
+  e.preventDefault(); addFiles(files); setStatus('Pasted image added as a reference.');
+});
+
+/* ================= import 3D files directly ================= */
+async function importModel(file) {
+  const ext = extOf(file); setStatus(`Importing “${file.name}”…`);
+  try {
+    const buf = await file.arrayBuffer(); let obj;
+    const gray = () => new THREE.MeshStandardMaterial({ color: 0xb9b3a8, roughness: 0.8 });
+    if (ext === 'glb' || ext === 'gltf') {
+      const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
+      obj = (await new GLTFLoader().parseAsync(ext === 'glb' ? buf : new TextDecoder().decode(buf), '')).scene;
+    } else if (ext === 'obj') {
+      const { OBJLoader } = await import('three/addons/loaders/OBJLoader.js');
+      obj = new OBJLoader().parse(new TextDecoder().decode(buf));
+    } else if (ext === 'fbx') {
+      const { FBXLoader } = await import('three/addons/loaders/FBXLoader.js');
+      obj = new FBXLoader().parse(buf, '');
+    } else if (ext === 'stl') {
+      const { STLLoader } = await import('three/addons/loaders/STLLoader.js');
+      const g = new STLLoader().parse(buf); g.computeVertexNormals(); obj = new THREE.Mesh(g, gray());
+      obj.rotation.x = -Math.PI / 2; // STL files are usually Z-up
+    } else if (ext === 'ply') {
+      const { PLYLoader } = await import('three/addons/loaders/PLYLoader.js');
+      const g = new PLYLoader().parse(buf); g.computeVertexNormals();
+      obj = new THREE.Mesh(g, g.attributes.color ? new THREE.MeshStandardMaterial({ vertexColors: true }) : gray());
+    }
+    if (!obj) throw new Error('empty');
+    let count = 0;
+    obj.traverse(m => {
+      if (!m.isMesh) return; count++;
+      m.castShadow = m.receiveShadow = true;
+      const mat = Array.isArray(m.material) ? m.material[0] : m.material;
+      if (mat) origMat.set(m.geometry, m.material);
+      m.userData.styleable = true; m.userData.metal = false; m.userData.opacity = 1;
+      m.userData.color = mat && mat.color ? '#' + mat.color.getHexString() : '#b9b3a8';
+    });
+    if (!count) throw new Error('no meshes');
+    const wrap = new THREE.Group(); wrap.add(obj); wrap.updateMatrixWorld(true);
+    let box = new THREE.Box3().setFromObject(wrap), size = box.getSize(new V()), m = Math.max(size.x, size.y, size.z);
+    let sc = 1; if (m > 400) sc = 0.001; else if (m > 40) sc = 0.01;
+    obj.scale.multiplyScalar(sc); wrap.updateMatrixWorld(true);
+    box = new THREE.Box3().setFromObject(wrap); const c = box.getCenter(new V());
+    obj.position.x -= c.x; obj.position.z -= c.z;
+    addObject({ kind: 'mesh', name: file.name.replace(/\.[^.]+$/, '').slice(0, 40), parts: [] }, { mesh: wrap });
+    setTimeout(() => viewPreset('threeq'), 30);
+    setStatus(`Imported “${file.name}”${sc !== 1 ? ` (scaled from ${sc === 0.01 ? 'cm' : 'mm'})` : ''}. Use the Scale slider if the size looks off.`);
+  } catch { setStatus(`Couldn’t import “${file.name}”. A .glb with embedded textures works best.`, 'err'); }
+}
+
+/* ================= no-AI: 3D shape from reference images ================= */
+async function imageData(blob, maxSide) {
+  let src;
+  try { src = await createImageBitmap(blob); }
+  catch { src = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = URL.createObjectURL(blob); }); }
+  const w0 = src.width || src.naturalWidth, h0 = src.height || src.naturalHeight, s = Math.min(1, maxSide / Math.max(w0, h0));
+  const w = Math.max(2, Math.round(w0 * s)), h = Math.max(2, Math.round(h0 * s));
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(src, 0, 0, w, h);
+  return { w, h, px: g.getImageData(0, 0, w, h).data };
+}
+// Separates the subject from a plain-ish background; returns a cropped mask + colors.
+async function silhouette(blob, tolBase) {
+  const { w, h, px } = await imageData(blob, 320);
+  const N = w * h, mask = new Uint8Array(N);
+  // transparent PNGs: use alpha
+  let border = [], transparentBorder = 0;
+  for (let x = 0; x < w; x++) border.push(x, (h - 1) * w + x);
+  for (let y = 0; y < h; y++) border.push(y * w, y * w + w - 1);
+  for (const i of border) if (px[i * 4 + 3] < 30) transparentBorder++;
+  if (transparentBorder > border.length * 0.5) {
+    for (let i = 0; i < N; i++) mask[i] = px[i * 4 + 3] > 60 ? 1 : 0;
+  } else {
+    const med = ch => { const a = border.map(i => px[i * 4 + ch]).sort((p, q) => p - q); return a[a.length >> 1]; };
+    const bg = [med(0), med(1), med(2)];
+    let sd = 0; for (const i of border) sd += Math.hypot(px[i * 4] - bg[0], px[i * 4 + 1] - bg[1], px[i * 4 + 2] - bg[2]); sd /= border.length;
+    const tol = clamp(tolBase + sd * 1.2, 12, 160);
+    const isBg = new Uint8Array(N), stack = [];
+    const near = i => Math.hypot(px[i * 4] - bg[0], px[i * 4 + 1] - bg[1], px[i * 4 + 2] - bg[2]) < tol;
+    for (const i of border) if (!isBg[i] && near(i)) { isBg[i] = 1; stack.push(i); }
+    while (stack.length) {
+      const i = stack.pop(), x = i % w, y = (i / w) | 0;
+      for (const j of [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, y > 0 ? i - w : -1, y < h - 1 ? i + w : -1])
+        if (j >= 0 && !isBg[j] && near(j)) { isBg[j] = 1; stack.push(j); }
+    }
+    for (let i = 0; i < N; i++) mask[i] = isBg[i] ? 0 : 1;
+  }
+  // keep the largest blob
+  const lab = new Int32Array(N); let best = 0, bestN = 0, cur = 0;
+  for (let i = 0; i < N; i++) if (mask[i] && !lab[i]) {
+    cur++; let n = 0; const st = [i]; lab[i] = cur;
+    while (st.length) { const k = st.pop(); n++; const x = k % w, y = (k / w) | 0;
+      for (const j of [x > 0 ? k - 1 : -1, x < w - 1 ? k + 1 : -1, y > 0 ? k - w : -1, y < h - 1 ? k + w : -1]) if (j >= 0 && mask[j] && !lab[j]) { lab[j] = cur; st.push(j); } }
+    if (n > bestN) { bestN = n; best = cur; }
+  }
+  let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for (let i = 0; i < N; i++) { mask[i] = lab[i] === best ? 1 : 0; if (mask[i]) { const x = i % w, y = (i / w) | 0; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } }
+  const frac = bestN / N;
+  if (!bestN || frac < 0.01) throw new Error('No clear subject found');
+  if (frac > 0.97) throw new Error('Couldn’t separate the subject from the background');
+  return { w, h, px, mask, x0, y0, x1, y1, bw: x1 - x0 + 1, bh: y1 - y0 + 1, frac };
+}
+// sample a silhouette at normalized coords (u right, v down) within its crop box
+function sampleSil(S, u, v) {
+  const x = clamp(Math.floor(S.x0 + u * S.bw), 0, S.w - 1), y = clamp(Math.floor(S.y0 + v * S.bh), 0, S.h - 1), i = y * S.w + x;
+  return { on: S.mask[i] === 1, r: S.px[i * 4], g: S.px[i * 4 + 1], b: S.px[i * 4 + 2] };
+}
+function lin(c) { c /= 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
+function buildShapeMesh(front, side, back) {
+  const NY = 104, NX = Math.max(3, Math.round(NY * front.bw / front.bh));
+  // 2D front occupancy on the grid
+  const F = new Uint8Array(NX * NY);
+  for (let y = 0; y < NY; y++) for (let x = 0; x < NX; x++) F[y * NX + x] = sampleSil(front, (x + .5) / NX, 1 - (y + .5) / NY).on ? 1 : 0;
+  let NZ, filled;
+  if (side) {
+    NZ = Math.max(3, Math.round(NY * side.bw / side.bh));
+    const Sd = new Uint8Array(NZ * NY);
+    // side camera looks from the model's left (+X): image left = model front (+Z) unless flipped
+    for (let y = 0; y < NY; y++) for (let z = 0; z < NZ; z++) Sd[y * NZ + z] = sampleSil(side, side.flip ? (z + .5) / NZ : 1 - (z + .5) / NZ, 1 - (y + .5) / NY).on ? 1 : 0;
+    filled = (x, y, z) => F[y * NX + x] && Sd[y * NZ + z];
+  } else {
+    // inflate the front silhouette: thickness follows distance to the outline (rounded cut-out)
+    const D = new Float32Array(NX * NY), INF = 1e9;
+    for (let i = 0; i < D.length; i++) D[i] = F[i] ? INF : 0;
+    for (let y = 0; y < NY; y++) for (let x = 0; x < NX; x++) { const i = y * NX + x; if (!D[i]) continue;
+      D[i] = Math.min(D[i], x > 0 ? D[i - 1] + 1 : 1, y > 0 ? D[i - NX] + 1 : 1, x > 0 && y > 0 ? D[i - NX - 1] + 1.414 : 1.414, x < NX - 1 && y > 0 ? D[i - NX + 1] + 1.414 : 1.414); }
+    for (let y = NY - 1; y >= 0; y--) for (let x = NX - 1; x >= 0; x--) { const i = y * NX + x; if (!D[i]) continue;
+      D[i] = Math.min(D[i], x < NX - 1 ? D[i + 1] + 1 : 1, y < NY - 1 ? D[i + NX] + 1 : 1, x < NX - 1 && y < NY - 1 ? D[i + NX + 1] + 1.414 : 1.414, x > 0 && y < NY - 1 ? D[i + NX - 1] + 1.414 : 1.414); }
+    let maxD = 1; for (const d of D) if (d > maxD) maxD = d;
+    const half = new Float32Array(D.length); for (let i = 0; i < D.length; i++) half[i] = D[i] ? Math.max(1, Math.sqrt(D[i] * maxD) * 0.85) : 0;
+    NZ = Math.ceil(maxD * 0.85 * 2) + 2;
+    const cz = NZ / 2;
+    filled = (x, y, z) => { const hh = half[y * NX + x]; return hh > 0 && Math.abs(z + .5 - cz) <= hh; };
+  }
+  const occ = new Uint8Array(NX * NY * NZ), idx = (x, y, z) => (y * NZ + z) * NX + x;
+  let count = 0;
+  for (let y = 0; y < NY; y++) for (let z = 0; z < NZ; z++) for (let x = 0; x < NX; x++) if (filled(x, y, z)) { occ[idx(x, y, z)] = 1; count++; }
+  if (count < 20) throw new Error('The front and side views don’t overlap. Check which image is the side view.');
+  const isOn = (x, y, z) => x >= 0 && y >= 0 && z >= 0 && x < NX && y < NY && z < NZ && occ[idx(x, y, z)] === 1;
+  // colors per face from the views
+  const colFront = (x, y) => sampleSil(front, (x + .5) / NX, 1 - (y + .5) / NY);
+  const colBack = back ? (x, y) => sampleSil(back, 1 - (x + .5) / NX, 1 - (y + .5) / NY) : null;
+  const colSide = side ? (z, y) => sampleSil(side, side.flip ? (z + .5) / NZ : 1 - (z + .5) / NZ, 1 - (y + .5) / NY) : null;
+  // surface quads with shared corners
+  const vmap = new Map(), pos = [], col = [], cnt = [], tri = [];
+  const vert = (x, y, z, c) => { const k = (y * (NZ + 1) + z) * (NX + 1) + x; let i = vmap.get(k);
+    if (i === undefined) { i = pos.length / 3; vmap.set(k, i); pos.push(x, y, z); col.push(0, 0, 0); cnt.push(0); }
+    col[i * 3] += c[0]; col[i * 3 + 1] += c[1]; col[i * 3 + 2] += c[2]; cnt[i]++; return i; };
+  const DIRS = [[1, 0, 0, [0, 1, 0], [0, 0, 1]], [-1, 0, 0, [0, 0, 1], [0, 1, 0]], [0, 1, 0, [0, 0, 1], [1, 0, 0]], [0, -1, 0, [1, 0, 0], [0, 0, 1]], [0, 0, 1, [1, 0, 0], [0, 1, 0]], [0, 0, -1, [0, 1, 0], [1, 0, 0]]];
+  for (let y = 0; y < NY; y++) for (let z = 0; z < NZ; z++) for (let x = 0; x < NX; x++) {
+    if (!occ[idx(x, y, z)]) continue;
+    for (const [dx, dy, dz, u, v] of DIRS) {
+      if (isOn(x + dx, y + dy, z + dz)) continue;
+      let s;
+      if (dz === 1) s = colFront(x, y); else if (dz === -1) s = colBack ? colBack(x, y) : colFront(x, y);
+      else if (dx !== 0) s = colSide ? colSide(z, y) : colFront(x, y); else s = colFront(x, y);
+      if (!s.on) { const f = colFront(x, y); if (f.on) s = f; }
+      const c = [lin(s.r), lin(s.g), lin(s.b)];
+      const bx = x + (dx > 0 ? 1 : 0), by = y + (dy > 0 ? 1 : 0), bz = z + (dz > 0 ? 1 : 0);
+      const a = vert(bx, by, bz, c), b = vert(bx + u[0], by + u[1], bz + u[2], c), cc = vert(bx + u[0] + v[0], by + u[1] + v[1], bz + u[2] + v[2], c), d = vert(bx + v[0], by + v[1], bz + v[2], c);
+      tri.push(a, b, cc, a, cc, d);
+    }
+  }
+  // smooth the blocky surface (Taubin: smooths without shrinking much)
+  const nV = pos.length / 3, nb = Array.from({ length: nV }, () => new Set());
+  for (let i = 0; i < tri.length; i += 3) { const [a, b, c] = [tri[i], tri[i + 1], tri[i + 2]]; nb[a].add(b).add(c); nb[b].add(a).add(c); nb[c].add(a).add(b); }
+  let P = Float32Array.from(pos);
+  for (let it = 0; it < 8; it++) {
+    const lam = it % 2 ? -0.53 : 0.5, Q = new Float32Array(P.length);
+    for (let i = 0; i < nV; i++) { let sx = 0, sy = 0, sz = 0, n = 0; for (const j of nb[i]) { sx += P[j * 3]; sy += P[j * 3 + 1]; sz += P[j * 3 + 2]; n++; }
+      for (let k = 0; k < 3; k++) { const avg = (k === 0 ? sx : k === 1 ? sy : sz) / (n || 1); Q[i * 3 + k] = P[i * 3 + k] + lam * (avg - P[i * 3 + k]); } }
+    P = Q;
+  }
+  const C = new Float32Array(nV * 3); for (let i = 0; i < nV; i++) for (let k = 0; k < 3; k++) C[i * 3 + k] = col[i * 3 + k] / cnt[i];
+  for (let i = 0; i < nV; i++) { P[i * 3] -= NX / 2; P[i * 3 + 2] -= NZ / 2; }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(P, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(C, 3));
+  g.setIndex(tri); g.computeVertexNormals(); g.computeBoundingBox();
+  return { geometry: g, NY };
+}
+async function buildShapeFromRefs(q, note = '') {
+  const imgs = refImages();
+  const pick = role => imgs.find(r => r.role === role);
+  const fr = pick('front') || imgs.find(r => r.role !== 'skip');
+  if (!fr) { setStatus('Set one of the images to Front (click its label).', 'err'); return; }
+  const sd = pick('side') || pick('side-flip'), bk = pick('back');
+  setStatus('Cutting out your reference…');
+  await new Promise(r => setTimeout(r, 20));
+  try {
+    const tol = +$('#shapeTol').value;
+    const front = await silhouette(fr.blob, tol);
+    const side = sd && sd !== fr ? await silhouette(sd.blob, tol).catch(() => null) : null;
+    if (side) side.flip = sd.role === 'side-flip';
+    const back = bk && bk !== fr ? await silhouette(bk.blob, tol).catch(() => null) : null;
+    const { geometry, NY } = buildShapeMesh(front, side, back);
+    let H = parseFloat($('#shapeH').value);
+    if (!(H > 0)) H = (CHAR_RE.test(q || '') || front.bh / front.bw > 1.6) ? 1.75 : 1.0;
+    const s = H / NY;
+    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8 });
+    const mesh = new THREE.Mesh(geometry, mat); mesh.scale.setScalar(s); mesh.castShadow = mesh.receiveShadow = true;
+    origMat.set(geometry, mat);
+    mesh.userData = { styleable: true, color: '#c9c3b8', metal: false, opacity: 1 };
+    const wrap = new THREE.Group(); wrap.add(mesh);
+    const name = (q || fr.name.replace(/\.[^.]+$/, '') || 'Reference').slice(0, 40);
+    addObject({ kind: 'mesh', name: name + ' (shape)', parts: [] }, { mesh: wrap });
+    setTimeout(() => viewPreset(side ? 'threeq' : 'front'), 30);
+    const msg = side ? `Carved a 3D shape from your front${back ? ', side and back' : ' and side'} views` : `Made a rounded 3D cut-out from your front view. Add a side view (set its label to Side) for a full 3D shape`;
+    setStatus((note ? note + ' ' : '') + msg + `, ${H.toFixed(2)} m tall. If the edges look wrong, move the Cutout slider and build again.`, note ? 'err' : '');
+  } catch (e) {
+    setStatus((e && e.message ? e.message : 'Couldn’t build a shape from that image') + '. A photo or drawing on a plain, even background works best; try the Cutout slider.', 'err');
+  }
+}
+
+/* ================= Library: saved scenes, poses, objects/models, references ================= */
+const Lib = { mode: 'mem', db: null, uid: null, idb: null, mem: new Map(), items: [], ready: false, sceneId: null, sceneName: '', sceneSig: null };
+const LIB_TABS = [['current', 'Current work'], ['scene', 'Scenes'], ['pose', 'Poses'], ['object', 'Objects & models'], ['reference', 'References']];
+let libTab = 'current';
+const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const CHUNK = 150000;
+Lib.col = () => Lib.db.collection('data/users/' + Lib.uid);
+function idbOpen() { return new Promise((res, rej) => { const r = indexedDB.open('perspective-puppet', 1); r.onupgradeneeded = () => r.result.createObjectStore('items', { keyPath: 'id' }); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
+function idbDo(mode, fn) { return new Promise((res, rej) => { const tx = Lib.idb.transaction('items', mode), r = fn(tx.objectStore('items')); tx.oncomplete = () => res(r && r.result); tx.onerror = () => rej(tx.error); tx.onabort = () => rej(tx.error); }); }
+function abToB64(ab) { const u = new Uint8Array(ab); let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); }
+function b64ToAb(b) { const s = atob(b), u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u.buffer; }
+function dataUrlToBlob(d) { const [h, b] = d.split(','), mime = (h.match(/data:([^;]+)/) || [])[1] || 'application/octet-stream'; return new Blob([b64ToAb(b)], { type: mime }); }
+const libWhere = () => Lib.mode === 'db' ? 'Saved privately to your Claude account (only you can see it)' : Lib.mode === 'idb' ? 'Saved in this browser on this computer. Use “Back up all” now and then to keep a copy.' : 'Saving isn’t available here: use the ⬇ buttons to download files to your device.';
+
+async function libInit() {
+  if (!STANDALONE) {
+    const [db, user] = await Promise.all([capability('db'), capability('user')]);
+    if (db && user) { try { const id = await user.id(); if (id) { Lib.db = db; Lib.uid = id; Lib.mode = 'db'; } } catch { } }
+  }
+  if (Lib.mode !== 'db') { try { Lib.idb = await idbOpen(); Lib.mode = 'idb'; } catch { Lib.mode = 'mem'; } }
+  try { await libRefresh(); } catch (e) { if (Lib.mode === 'db') { Lib.mode = 'idb'; try { Lib.idb = await idbOpen(); } catch { Lib.mode = 'mem'; } await libRefresh().catch(() => { }); } }
+  Lib.ready = true; renderLibBadge();
+}
+async function libRefresh() {
+  let list = [];
+  if (Lib.mode === 'db') {
+    const snap = await Promise.race([Lib.col().where('rec', '==', 'item').get(), new Promise((_, rej) => setTimeout(() => rej({ code: 'timeout' }), 12000))]);
+    list = snap.docs.map(d => ({ ...d.data() }));
+  } else if (Lib.mode === 'idb') list = (await idbDo('readonly', st => st.getAll())).map(({ big, data, ...m }) => m);
+  else list = [...Lib.mem.values()].map(({ big, data, ...m }) => m);
+  Lib.items = list.filter(x => x && x.id).sort((a, b) => b.updated - a.updated);
+  renderLibrary(); renderLibBadge(); renderHome();
+}
+async function libPut(it) {
+  const now = Date.now();
+  const rec = { rec: 'item', id: it.id || newId(), type: it.type, name: String(it.name || 'Untitled').slice(0, 80), created: it.created || now, updated: now, thumb: it.thumb || '' };
+  const payload = JSON.stringify({ data: it.data ?? null, big: it.big || '' });
+  if (Lib.mode === 'db') {
+    const col = Lib.col(), n = Math.max(1, Math.ceil(payload.length / CHUNK)), prev = Lib.items.find(x => x.id === rec.id);
+    for (let i = 0; i < n; i++) await col.doc(`ch_${rec.id}_${i}`).set({ rec: 'chunk', s: payload.slice(i * CHUNK, (i + 1) * CHUNK) });
+    for (let i = n; i < ((prev && prev.chunks) || 0); i++) await col.doc(`ch_${rec.id}_${i}`).delete().catch(() => { });
+    rec.chunks = n; rec.size = payload.length;
+    await col.doc('it_' + rec.id).set(rec);
+  } else {
+    const full = { ...rec, data: it.data ?? null, big: it.big || '', size: payload.length };
+    if (Lib.mode === 'idb') await idbDo('readwrite', st => st.put(full)); else Lib.mem.set(rec.id, full);
+  }
+  const i = Lib.items.findIndex(x => x.id === rec.id); if (i >= 0) Lib.items.splice(i, 1);
+  Lib.items.unshift({ ...rec, size: payload.length }); renderLibrary(); renderLibBadge();
+  return rec.id;
+}
+async function libGet(id) {
+  const m = Lib.items.find(x => x.id === id); if (!m) throw new Error('missing');
+  if (Lib.mode === 'db') {
+    let s = ''; for (let i = 0; i < (m.chunks || 0); i++) { const d = await Lib.col().doc(`ch_${id}_${i}`).get(); if (!d.exists) throw new Error('A part of this item is missing'); s += d.data().s; }
+    const p = JSON.parse(s || '{}'); return { ...m, data: p.data, big: p.big };
+  }
+  if (Lib.mode === 'idb') return await idbDo('readonly', st => st.get(id));
+  return Lib.mem.get(id);
+}
+async function libDel(id) {
+  const m = Lib.items.find(x => x.id === id);
+  if (Lib.mode === 'db') { await Lib.col().doc('it_' + id).delete(); for (let i = 0; i < ((m && m.chunks) || 0); i++) await Lib.col().doc(`ch_${id}_${i}`).delete().catch(() => { }); }
+  else if (Lib.mode === 'idb') await idbDo('readwrite', st => st.delete(id)); else Lib.mem.delete(id);
+  Lib.items = Lib.items.filter(x => x.id !== id);
+  if (Lib.sceneId === id) Lib.sceneId = null;
+  objects.forEach(o => { if (o.libId === id) o.libId = null; }); refs.forEach(r => { if (r.libId === id) r.libId = null; });
+  renderLibrary(); renderLibBadge();
+}
+function libErr(e, what) {
+  console.warn(e);
+  const c = e && e.code;
+  setStatus(c === 'quota_exceeded' ? `Your library is full, so ${what} wasn’t saved. Delete some items (or download them) and try again.` : c === 'invalid_argument' ? `Couldn’t save ${what}: you may only have view access to this page. Use ⬇ Download instead.` : `Couldn’t save ${what} (${c || (e && e.message) || 'error'}). Use ⬇ Download to keep a copy on your device.`, 'err');
+}
+
+/* --- what an item holds --- */
+const serT = o => ({ p: o.root.position.toArray(), q: o.root.quaternion.toArray(), s: o.root.scale.toArray() });
+const objSig = o => JSON.stringify([o.def.kind === 'mesh' ? 'mesh' + o.id : o.def, o.kind === 'character' ? o.pose : 0, o.name]);
+const sceneSig = () => JSON.stringify(objects.map(o => [objSig(o), serT(o), o.root.visible]));
+const isObjSaved = o => !!o.libId && o.savedSig === objSig(o) && Lib.items.some(x => x.id === o.libId);
+const isSceneSaved = () => !!Lib.sceneId && Lib.sceneSig === sceneSig() && Lib.items.some(x => x.id === Lib.sceneId);
+const isRefSaved = r => !!r.libId && Lib.items.some(x => x.id === r.libId);
+function unsavedCount() { if (!Lib.ready) return 0; return (objects.length && !isSceneSaved() ? 1 : 0) + objects.filter(o => !isObjSaved(o)).length + refs.filter(r => !isRefSaved(r)).length; }
+function renderLibBadge() { const b = $('#libBtn'); if (!b) return; const n = unsavedCount(); const mb = $('#mLib'); if (mb) mb.innerHTML = '📚' + (n ? `<span class="pill" style="margin-left:4px">${n}</span>` : ''); b.innerHTML = '📚 Library' + (n ? ` <span class="pill">${n} unsaved</span>` : ''); if ($('#libModal').classList.contains('show') && libTab === 'current') renderLibrary(); }
+
+async function glbOf(node) {
+  const prev = style; if (prev !== 'color') setStyle('color');
+  const hidden = []; node.traverse(x => { if (x.userData && x.userData.headLines && x.visible) { x.visible = false; hidden.push(x); } });
+  try { return await new GLTFExporter().parseAsync(node, { binary: true, onlyVisible: true }); }
+  finally { hidden.forEach(x => x.visible = true); if (prev !== 'color') setStyle(prev); }
+}
+async function meshFromB64(b64) {
+  const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
+  const g = await new GLTFLoader().parseAsync(b64ToAb(b64), '');
+  const obj = g.scene;
+  obj.traverse(m => { if (!m.isMesh) return; m.castShadow = m.receiveShadow = true; const mat = Array.isArray(m.material) ? m.material[0] : m.material;
+    if (mat) origMat.set(m.geometry, m.material); Object.assign(m.userData, { styleable: true, metal: false, opacity: 1, color: mat && mat.color ? '#' + mat.color.getHexString() : '#b9b3a8' }); });
+  const wrap = new THREE.Group(); wrap.add(obj); return wrap;
+}
+function makeThumb(o) {
+  const W = 240, H = 180, hidden = []; tc.visible = false;
+  if (o) world.children.forEach(r => { if (r !== o.root && r.visible) { r.visible = false; hidden.push(r); } });
+  const box = new THREE.Box3().setFromObject(o ? o.root : world);
+  if (box.isEmpty()) box.set(new V(-.5, 0, -.5), new V(.5, 1.8, .5));
+  const c = box.getCenter(new V()), r = Math.max(box.getSize(new V()).length() / 2, 0.05), d = r / Math.sin(15 * D2R) * 1.02;
+  const yaw = o ? new THREE.Euler().setFromQuaternion(o.root.quaternion, 'YXZ').y : 0, az = yaw + 35 * D2R, el = 14 * D2R;
+  const cam = new THREE.PerspectiveCamera(30, W / H, 0.01, 3000);
+  cam.position.set(c.x + Math.sin(az) * Math.cos(el) * d, c.y + Math.sin(el) * d, c.z + Math.cos(az) * Math.cos(el) * d); cam.lookAt(c);
+  let url = '';
+  try {
+    renderer.setPixelRatio(1); renderer.setSize(W, H, false);
+    if (style === 'comic' || style === 'ink') outline.render(scene, cam); else renderer.render(scene, cam);
+    url = glc.toDataURL('image/jpeg', 0.72);
+  } finally { renderer.setPixelRatio(dpr); renderer.setSize(vw, vh, false); hidden.forEach(x => x.visible = true); tc.visible = true; }
+  return url;
+}
+async function smallImage(blob, side) { return await blobToB64(await toPng(blob, side)); }
+
+/* --- save actions --- */
+async function saveObject(o, asNew = false) {
+  try {
+    setStatus(`Saving “${o.name}”…`);
+    const it = { id: asNew ? null : o.libId, type: 'object', name: o.name, thumb: makeThumb(o) };
+    if (o.def.kind === 'mesh') { it.data = { kind: 'mesh', name: o.name }; it.big = abToB64(await glbOf(o.meshSrc)); }
+    else it.data = { kind: o.kind, def: o.def, pose: o.kind === 'character' ? o.pose : undefined, name: o.name };
+    if (it.id && !Lib.items.some(x => x.id === it.id)) it.id = null;
+    o.libId = await libPut(it); o.savedSig = objSig(o);
+    setStatus(`Saved “${o.name}” to your Library.`); renderInspector(); return true;
+  } catch (e) { libErr(e, `“${o.name}”`); return false; }
+}
+async function savePose(o) {
+  try {
+    await libPut({ type: 'pose', name: o.name + ' pose', thumb: makeThumb(o), data: { pose: o.pose, body: o.def.body } });
+    setStatus('Pose saved to your Library. Apply it to any character from Library → Poses.');
+  } catch (e) { libErr(e, 'the pose'); }
+}
+async function saveScene(asNew = false, name = '') {
+  try {
+    setStatus('Saving scene…');
+    const meshes = {};
+    for (let i = 0; i < objects.length; i++) if (objects[i].def.kind === 'mesh') meshes[i] = abToB64(await glbOf(objects[i].meshSrc));
+    const data = {
+      objects: objects.map(o => ({ def: o.def.kind === 'mesh' ? { kind: 'mesh', name: o.name, parts: [] } : o.def, pose: o.pose, name: o.name, vis: o.root.visible, t: serT(o) })),
+      camera: { p: camera.position.toArray(), t: controls.target.toArray(), f: camera.getFocalLength(), roll: +$('#roll').value },
+    };
+    const nm = name || Lib.sceneName || ('Scene ' + new Date().toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }));
+    const id = await libPut({ id: asNew ? null : (Lib.items.some(x => x.id === Lib.sceneId) ? Lib.sceneId : null), type: 'scene', name: nm, thumb: makeThumb(null), data, big: Object.keys(meshes).length ? JSON.stringify(meshes) : '' });
+    Lib.sceneId = id; Lib.sceneName = nm; Lib.sceneSig = sceneSig(); ST.set('pp3d.sceneId', { id, name: nm }); ST.set('pp3d.sceneSig', Lib.sceneSig);
+    updateSceneTitle(); renderHome();
+    setStatus(`Saved scene “${nm}” (${objects.length} object${objects.length === 1 ? '' : 's'}).`); renderLibBadge(); return true;
+  } catch (e) { libErr(e, 'the scene'); return false; }
+}
+async function saveRef(r) {
+  try {
+    const it = { type: 'reference', name: r.name };
+    if (r.kind === 'image') { it.big = await smallImage(r.blob, 1400); it.thumb = await smallImage(r.blob, 240); it.data = { kind: 'image', role: r.role }; }
+    else it.data = { kind: 'text', text: r.text };
+    r.libId = await libPut(it); renderTray(); return true;
+  } catch (e) { libErr(e, `the reference “${r.name}”`); return false; }
+}
+async function saveEverything() {
+  let ok = true;
+  for (const o of objects) if (!isObjSaved(o)) ok = (await saveObject(o)) && ok;
+  for (const r of refs) if (!isRefSaved(r)) ok = (await saveRef(r)) && ok;
+  if (objects.length && !isSceneSaved()) ok = (await saveScene()) && ok;
+  if (ok) setStatus('Everything is saved ✓');
+}
+
+/* --- load / use actions --- */
+function targetCharacter() { return (sel && sel.kind === 'character') ? sel : objects.find(o => o.kind === 'character') || null; }
+async function useItem(id) {
+  const it = await libGet(id);
+  if (it.type === 'pose') {
+    let o = targetCharacter();
+    if (!o) o = addObject({ kind: 'character', name: 'Mannequin', body: { ...BODY_DEFAULT, ...(it.data.body || {}) }, pose: {}, parts: [] });
+    o.pose = JSON.parse(JSON.stringify(it.data.pose || {})); applyPose(o); select(o); save();
+    setStatus(`Applied “${it.name}” to ${o.name}.`);
+  } else if (it.type === 'object') {
+    let o;
+    if (it.data.kind === 'mesh') o = addObject({ kind: 'mesh', name: it.name, parts: [] }, { mesh: await meshFromB64(it.big) });
+    else o = addObject({ ...it.data.def, pose: it.data.pose, name: it.data.name || it.name });
+    o.libId = id; o.savedSig = objSig(o); setTimeout(() => viewPreset('threeq'), 30); renderLibBadge();
+    setStatus(`Added “${it.name}” to the scene.`);
+  } else if (it.type === 'reference') {
+    if (it.data.kind === 'image') { const b = dataUrlToBlob(it.big); refs.push({ kind: 'image', blob: b, url: URL.createObjectURL(b), name: it.name, role: it.data.role || nextRole(), libId: id }); }
+    else refs.push({ kind: 'text', name: it.name, text: it.data.text || '', libId: id });
+    renderTray(); setStatus(`Added “${it.name}” to your references.`);
+  } else if (it.type === 'scene') await loadScene(it);
+}
+async function loadScene(it) {
+  setStatus(`Opening “${it.name}”…`); closeHome();
+  select(null);
+  for (const o of [...objects]) world.remove(o.root);
+  objects = [];
+  const meshes = it.big ? JSON.parse(it.big) : {};
+  const list = (it.data && it.data.objects) || [];
+  for (let i = 0; i < list.length; i++) {
+    const s = list[i];
+    try {
+      const o = s.def.kind === 'mesh'
+        ? (meshes[i] ? addObject({ kind: 'mesh', name: s.name, parts: [] }, { mesh: await meshFromB64(meshes[i]), t: s.t, silent: true }) : null)
+        : addObject({ ...s.def, pose: s.pose, name: s.name }, { t: s.t, silent: true });
+      if (o) o.root.visible = s.vis !== false;
+    } catch (e) { console.warn(e); }
+  }
+  const c = it.data && it.data.camera;
+  if (c) { tween = null; camera.position.fromArray(c.p); controls.target.fromArray(c.t); setFocal(c.f || 35, false); $('#roll').value = c.roll || 0; $('#roll').dispatchEvent(new Event('input')); }
+  Lib.sceneId = it.id; Lib.sceneName = it.name; Lib.sceneSig = sceneSig(); ST.set('pp3d.sceneId', { id: it.id, name: it.name }); ST.set('pp3d.sceneSig', Lib.sceneSig);
+  renderList(); renderInspector(); save(); renderLibBadge();
+  setStatus(`Opened scene “${it.name}”.`); updateSceneTitle();
+}
+
+/* --- download to device --- */
+const fileSafe = s => String(s || 'item').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').slice(0, 50) || 'item';
+const jsonBlob = o => new Blob([JSON.stringify(o)], { type: 'application/json' });
+async function downloadItem(id) {
+  const it = await libGet(id), base = fileSafe(it.name);
+  if (it.type === 'object' && it.data.kind === 'mesh') return offerFile(new Blob([b64ToAb(it.big)], { type: 'model/gltf-binary' }), base + '.glb', false);
+  if (it.type === 'reference') return it.data.kind === 'image' ? offerFile(dataUrlToBlob(it.big), base + '.jpg', true) : offerFile(new Blob([it.data.text || ''], { type: 'text/plain' }), base + '.txt', false);
+  return offerFile(jsonBlob({ app: 'perspective-puppet', v: 1, type: it.type, name: it.name, thumb: it.thumb, data: it.data, big: it.big || undefined }), `${base}.${it.type}.json`, false);
+}
+async function downloadObject(o, fmt) {
+  const base = fileSafe(o.name);
+  if (fmt === 'glb' || o.def.kind === 'mesh') return offerFile(new Blob([await glbOf(o.def.kind === 'mesh' ? o.meshSrc : o.fig)], { type: 'model/gltf-binary' }), base + '.glb', false);
+  return offerFile(jsonBlob({ app: 'perspective-puppet', v: 1, type: 'object', name: o.name, data: { kind: o.kind, def: o.def, pose: o.kind === 'character' ? o.pose : undefined, name: o.name } }), base + '.object.json', false);
+}
+async function downloadPose(o) { return offerFile(jsonBlob({ app: 'perspective-puppet', v: 1, type: 'pose', name: o.name + ' pose', data: { pose: o.pose, body: o.def.body } }), fileSafe(o.name) + '.pose.json', false); }
+async function downloadScene() {
+  const meshes = {}; for (let i = 0; i < objects.length; i++) if (objects[i].def.kind === 'mesh') meshes[i] = abToB64(await glbOf(objects[i].meshSrc));
+  return offerFile(jsonBlob({ app: 'perspective-puppet', v: 1, type: 'scene', name: Lib.sceneName || 'Scene', data: { objects: objects.map(o => ({ def: o.def.kind === 'mesh' ? { kind: 'mesh', name: o.name, parts: [] } : o.def, pose: o.pose, name: o.name, vis: o.root.visible, t: serT(o) })), camera: { p: camera.position.toArray(), t: controls.target.toArray(), f: camera.getFocalLength(), roll: +$('#roll').value } }, big: Object.keys(meshes).length ? JSON.stringify(meshes) : undefined }), fileSafe(Lib.sceneName || 'scene') + '.scene.json', false);
+}
+async function downloadRef(r) { return r.kind === 'image' ? offerFile(r.blob, fileSafe(r.name.replace(/\.[^.]+$/, '')) + '.jpg', true) : offerFile(new Blob([r.text], { type: 'text/plain' }), fileSafe(r.name) + '.txt', false); }
+async function backupAll() {
+  setStatus('Packing your library…');
+  const items = []; for (const m of Lib.items) { try { items.push(await libGet(m.id)); } catch { } }
+  await offerFile(jsonBlob({ app: 'perspective-puppet', v: 1, type: 'backup', created: Date.now(), items }), `perspective-puppet-backup-${new Date().toISOString().slice(0, 10)}.json`, false);
+  setStatus(`Backed up ${items.length} item${items.length === 1 ? '' : 's'}.`);
+}
+async function importLibraryJson(j, fname) {
+  if (j.type === 'backup') {
+    let n = 0; for (const it of (j.items || [])) { if (!it || !it.type) continue; try { await libPut({ ...it, id: Lib.items.some(x => x.id === it.id) ? null : it.id }); n++; } catch (e) { libErr(e, 'an item'); break; } }
+    setStatus(`Restored ${n} item${n === 1 ? '' : 's'} from the backup.`); openLibrary('scene'); return;
+  }
+  if (!['scene', 'pose', 'object'].includes(j.type)) throw new Error('unknown');
+  let id = null;
+  try { id = await libPut({ type: j.type, name: j.name || fname, thumb: j.thumb || '', data: j.data, big: j.big || '' }); } catch (e) { libErr(e, `“${j.name || fname}”`); }
+  if (id) await useItem(id);
+  else if (j.type === 'object' && j.data.kind !== 'mesh') addObject({ ...j.data.def, pose: j.data.pose, name: j.data.name || j.name });
+}
+
+/* --- the Library window --- */
+function openLibrary(tab) { if (tab) libTab = tab; $('#libModal').classList.add('show'); renderLibrary(); }
+const fmtDate = t => new Date(t).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+const typeIcon = { scene: '🎬', pose: '🤸', object: '📦', reference: '🖼' };
+function renderLibrary() {
+  if (!$('#libModal').classList.contains('show')) return;
+  $('#libWhere').textContent = Lib.ready ? libWhere() : 'Loading your library…';
+  const counts = { current: unsavedCount() };
+  for (const t of ['scene', 'pose', 'object', 'reference']) counts[t] = Lib.items.filter(x => x.type === t).length;
+  $('#libTabs').innerHTML = LIB_TABS.map(([k, l]) => `<button data-tab="${k}" class="${k === libTab ? 'on' : ''}">${l}${k === 'current' ? (counts.current ? ` <span class="pill">${counts.current} unsaved</span>` : ' ✓') : ` (${counts[k]})`}</button>`).join('');
+  const B = $('#libBody');
+  if (libTab === 'current') {
+    const pill = ok => ok ? '<span class="pill ok">Saved</span>' : '<span class="pill">Unsaved</span>';
+    let h = `<div class="sub" style="margin-top:0">This scene</div>`;
+    h += `<div class="urow"><div class="ic2">🎬</div><div style="flex:1"><div class="nm2">${esc(Lib.sceneName || 'Current scene')}</div><div class="dt">${objects.length} object${objects.length === 1 ? '' : 's'}</div></div>${pill(objects.length && isSceneSaved())}<button class="btn" data-act="scene-save">💾 Save</button>${Lib.sceneId ? '<button class="btn" data-act="scene-saveas">Save as new</button>' : ''}<button class="btn" data-act="scene-dl">⬇ Download</button></div>`;
+    h += `<div class="sub">Objects in the scene</div>`;
+    h += objects.length ? objects.map(o => `<div class="urow"><div class="ic2">${o.kind === 'character' ? '🧍' : o.def.kind === 'mesh' ? '🗿' : '📦'}</div><div style="flex:1;min-width:0"><div class="nm2">${esc(o.name)}</div><div class="dt">${o.kind === 'character' ? 'Character' : o.def.kind === 'mesh' ? '3D model' : 'Prop'}</div></div>${pill(isObjSaved(o))}<button class="btn" data-act="obj-save" data-oid="${o.id}">💾 Save</button>${o.kind === 'character' ? `<button class="btn" data-act="obj-pose" data-oid="${o.id}">💾 Pose</button>` : ''}<button class="btn" data-act="obj-dl" data-oid="${o.id}">⬇ ${o.def.kind === 'mesh' ? '.glb' : 'File'}</button>${o.def.kind !== 'mesh' ? `<button class="btn" data-act="obj-glb" data-oid="${o.id}">⬇ .glb</button>` : ''}</div>`).join('') : '<div class="empty">The scene is empty.</div>';
+    h += `<div class="sub">References in your tray</div>`;
+    refs.forEach(r => { r.uid = r.uid || newId(); });
+    h += refs.length ? refs.map(r => `<div class="urow">${r.kind === 'image' ? `<img src="${r.url}" alt="">` : '<div class="ic2">📄</div>'}<div style="flex:1;min-width:0"><div class="nm2">${esc(r.name)}</div><div class="dt">${r.kind === 'image' ? 'Image · ' + (ROLE_LABEL[r.role] || '') : 'Notes'}</div></div>${pill(isRefSaved(r))}<button class="btn" data-act="ref-save" data-rid="${r.uid}" ${isRefSaved(r) ? 'disabled' : ''}>💾 Save</button><button class="btn" data-act="ref-dl" data-rid="${r.uid}">⬇ Download</button></div>`).join('') : '<div class="empty">No references in the tray. Saved ones are under References.</div>';
+    B.innerHTML = h; return;
+  }
+  const list = Lib.items.filter(x => x.type === libTab);
+  if (!Lib.ready) { B.innerHTML = '<div class="empty">Loading…</div>'; return; }
+  if (!list.length) { B.innerHTML = `<div class="empty">Nothing saved here yet. ${libTab === 'pose' ? 'Select a character and click “💾 Save pose”.' : libTab === 'reference' ? 'Add an image to the reference tray, then save it from Current work.' : 'Use the 💾 Save buttons in Current work.'}</div>`; return; }
+  const useLabel = { scene: 'Open', pose: 'Apply', object: 'Add to scene', reference: 'Use' }[libTab];
+  B.innerHTML = '<div class="libgrid">' + list.map(m => `<div class="lcard" data-id="${m.id}">${m.thumb ? `<img src="${m.thumb}" alt="">` : `<div class="ph">${typeIcon[m.type]}</div>`}<div class="b"><div class="nm" title="${esc(m.name)}">${esc(m.name)}</div><div class="dt">${fmtDate(m.updated)}${m.size > 400000 ? ' · ' + (m.size / 1e6).toFixed(1) + ' MB' : ''}</div><div class="acts"><button class="btn primary" data-act="use" data-id="${m.id}">${useLabel}</button><button class="btn" data-act="dl" data-id="${m.id}" title="Download to your device">⬇</button><button class="btn" data-act="ren" data-id="${m.id}" title="Rename">✎</button><button class="btn danger" data-act="del" data-id="${m.id}" title="Delete">🗑</button></div></div></div>`).join('') + '</div>';
+}
+$('#libBtn').onclick = () => openLibrary();
+$('#libClose').onclick = () => $('#libModal').classList.remove('show');
+$('#libModal').addEventListener('click', e => { if (e.target.id === 'libModal') $('#libModal').classList.remove('show'); });
+$('#libTabs').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) { libTab = b.dataset.tab; renderLibrary(); } });
+$('#libSaveScene').onclick = () => saveScene();
+$('#libSaveAll').onclick = () => saveEverything();
+$('#libBackup').onclick = () => backupAll();
+$('#libImport').onclick = () => $('#libFile').click();
+$('#libFile').onchange = e => { const fromHome = $('#home').classList.contains('show'); addFiles([...e.target.files]).then(() => { if (fromHome && objects.length) closeHome(); }); e.target.value = ''; };
+$('#libBody').addEventListener('click', async e => {
+  const b = e.target.closest('button[data-act]'); if (!b) return;
+  const a = b.dataset.act, id = b.dataset.id, o = b.dataset.oid ? objects.find(x => x.id === +b.dataset.oid) : null, r = b.dataset.rid ? refs.find(x => x.uid === b.dataset.rid) : null;
+  b.disabled = true;
+  try {
+    if (a === 'scene-save') await saveScene();
+    else if (a === 'scene-saveas') await saveScene(true, (Lib.sceneName || 'Scene') + ' copy');
+    else if (a === 'scene-dl') await downloadScene();
+    else if (a === 'obj-save' && o) await saveObject(o);
+    else if (a === 'obj-pose' && o) await savePose(o);
+    else if (a === 'obj-dl' && o) await downloadObject(o);
+    else if (a === 'obj-glb' && o) await downloadObject(o, 'glb');
+    else if (a === 'ref-save' && r) await saveRef(r);
+    else if (a === 'ref-dl' && r) await downloadRef(r);
+    else if (a === 'use') { await useItem(id); if (['scene', 'object', 'pose'].includes(Lib.items.find(x => x.id === id)?.type)) $('#libModal').classList.remove('show'); }
+    else if (a === 'dl') await downloadItem(id);
+    else if (a === 'del') {
+      if (b.dataset.confirm) { await libDel(id); return; }
+      b.dataset.confirm = '1'; b.textContent = 'Delete?'; b.disabled = false; setTimeout(() => { if (b.isConnected) { delete b.dataset.confirm; b.textContent = '🗑'; } }, 3000); return;
+    } else if (a === 'ren') {
+      const card = b.closest('.lcard'), nm = card.querySelector('.nm'), m = Lib.items.find(x => x.id === id);
+      nm.innerHTML = `<input value="${esc(m.name)}" style="width:100%;background:var(--ink);border:1px solid var(--accent);border-radius:5px;padding:2px 5px">`;
+      const inp = nm.querySelector('input'); inp.focus(); inp.select();
+      const done = async ok => { inp.onblur = null; if (ok && inp.value.trim() && inp.value.trim() !== m.name) { try { const full = await libGet(id); await libPut({ ...full, name: inp.value.trim() }); if (Lib.sceneId === id) Lib.sceneName = inp.value.trim(); } catch (err) { libErr(err, 'the new name'); } } renderLibrary(); };
+      inp.onkeydown = ev => { if (ev.key === 'Enter') done(true); if (ev.key === 'Escape') done(false); };
+      inp.onblur = () => done(true);
+    }
+  } catch (err) { libErr(err, 'that'); }
+  finally { if (b.isConnected && !b.dataset.confirm) b.disabled = false; renderLibBadge(); }
+});
+
+/* ================= Start menu: new scene, continue, saved scenes ================= */
+const yawQ = d => new THREE.Quaternion().setFromEuler(new THREE.Euler(0, d * D2R, 0)).toArray();
+const T = (x, z, yaw = 0, s = 1, y = 0) => ({ p: [x, y, z], q: yawQ(yaw), s: [s, s, s] });
+const libProp = key => { const e = LIB.find(x => x.k.includes(key)); return { kind: 'prop', name: e.n, parts: e.p() }; };
+const man = (name, body, pose) => ({ kind: 'character', name, body: { ...BODY_DEFAULT, ...body }, pose: JSON.parse(JSON.stringify(POSES[pose] || {})), parts: [] });
+const roomShell = () => ({ kind: 'prop', name: 'Room', parts: [
+  { shape: 'box', size: [5, 0.04, 4], pos: [0, 0.02, 0], color: '#b9a88f', name: 'floor' },
+  { shape: 'box', size: [5, 2.7, 0.1], pos: [0, 1.35, -2.05], color: '#d8d2c6', name: 'back wall' },
+  { shape: 'box', size: [0.1, 2.7, 4], pos: [-2.55, 1.35, 0], color: '#cfc8bb', name: 'side wall' },
+  { shape: 'box', size: [1.2, 1.1, 0.04], pos: [0.8, 1.6, -1.99], color: '#a9cbe0', name: 'window' }] });
+const TEMPLATES = [
+  { id: 'blank', icon: '⬜', name: 'Empty', hint: 'Start from nothing', build: () => [] },
+  { id: 'one', icon: '🧍', name: 'One figure', hint: 'A single posable mannequin', build: () => [[man('Mannequin', {}, 'Contrapposto'), T(0, 0)]] },
+  { id: 'duo', icon: '🗣', name: 'Conversation', hint: 'Two people facing each other', build: () => [[man('Person A', BODY_PRESETS['Average man'], 'Stand'), T(-0.55, 0, 90)], [man('Person B', BODY_PRESETS['Average woman'], 'Contrapposto'), T(0.55, 0, -90)]] },
+  { id: 'fight', icon: '🥊', name: 'Fight', hint: 'Two fighters squaring off', build: () => [[man('Fighter A', BODY_PRESETS.Heroic, 'Fight'), T(-0.75, 0, 90)], [man('Fighter B', BODY_PRESETS.Brute, 'Fight'), T(0.85, 0, -90)]] },
+  { id: 'street', icon: '🏙', name: 'Street corner', hint: 'Buildings, car, lamp, a walker', build: () => [
+    [libProp('building'), T(-9, -11)], [libProp('building'), T(7, -13, 0, 0.8)], [libProp('car'), T(-1.8, 3.2, 90)],
+    [libProp('street lamp'), T(2.6, 0.6, -90)], [libProp('hydrant'), T(1.6, 1.4)], [libProp('bench'), T(-3, -1.5)],
+    [man('Walker', {}, 'Walk'), T(0.3, 0.8, 20)]] },
+  { id: 'room', icon: '🛋', name: 'Room', hint: 'Interior with furniture', build: () => [
+    [roomShell(), T(0, 0)], [libProp('bed'), T(-1.5, -0.8)], [libProp('desk'), T(1.4, -1.55)], [libProp('chair'), T(1.4, -0.9, 180)],
+    [libProp('bookshelf'), T(-2.3, 1.2, 90)], [man('Sitter', {}, 'Sit'), T(1.4, -0.75, 180)]] },
+];
+let homeConfirm = null; // pending action that needs a save decision
+function sceneIsDirty() { return objects.length > 0 && !isSceneSaved(); }
+function clearScene() { select(null); for (const o of [...objects]) world.remove(o.root); objects = []; }
+function newScene(tid, name) {
+  const t = TEMPLATES.find(x => x.id === tid) || TEMPLATES[0];
+  clearScene();
+  for (const [def, tr] of t.build()) addObject(def, { t: tr, silent: true });
+  Lib.sceneId = null; Lib.sceneName = name || t.name + ' scene'; Lib.sceneSig = null;
+  ST.set('pp3d.sceneId', { id: null, name: Lib.sceneName }); ST.set('pp3d.sceneSig', null);
+  renderList(); renderInspector(); save(); updateSceneTitle();
+  closeHome(); setTimeout(() => viewPreset(tid === 'street' ? 'eye' : 'threeq'), 40);
+  setStatus(`New scene “${Lib.sceneName}”. Search above or use + Mannequin to add things.`);
+}
+function guard(action) { if (sceneIsDirty()) { homeConfirm = action; renderHome(); } else action(); }
+function openHome() { $('#home').classList.add('show'); homeConfirm = null; renderHome(); }
+function closeHome() { $('#home').classList.remove('show'); homeConfirm = null; }
+function updateSceneTitle() { const el = $('#sceneTitle'); if (el && !el.querySelector('input')) el.textContent = Lib.sceneName || 'Untitled scene'; const mt = $('#mTitle'); if (mt) mt.textContent = Lib.sceneName || 'Untitled scene'; }
+function renderHome() {
+  if (!$('#home').classList.contains('show')) return;
+  $('#homeTpl').innerHTML = TEMPLATES.map(t => `<button class="tpl" data-tpl="${t.id}"><span class="ti">${t.icon}</span><b>${t.name}</b><small>${t.hint}</small></button>`).join('');
+  const cont = $('#homeCont');
+  if (objects.length) {
+    const saved = isSceneSaved();
+    cont.innerHTML = `<button class="contcard" data-home="continue"><div class="ci">▶</div><div style="flex:1;min-width:0;text-align:left"><b>Continue “${esc(Lib.sceneName || 'Untitled scene')}”</b><small>${objects.length} object${objects.length === 1 ? '' : 's'} · ${Lib.ready ? (saved ? 'saved' : 'unsaved changes') : 'last session'}</small></div></button>`;
+  } else cont.innerHTML = '';
+  const scenes = Lib.items.filter(x => x.type === 'scene');
+  $('#homeScenes').innerHTML = !Lib.ready ? '<div class="empty">Loading your saved scenes…</div>'
+    : scenes.length ? scenes.map(m => `<div class="hscene">${m.thumb ? `<img src="${m.thumb}" alt="">` : '<div class="ph">🎬</div>'}<div class="b"><div class="nm" title="${esc(m.name)}">${esc(m.name)}</div><div class="dt">${fmtDate(m.updated)}</div><div class="acts"><button class="btn primary" data-open="${m.id}">Open</button><button class="btn danger" data-hdel="${m.id}" title="Delete">🗑</button></div></div></div>`).join('')
+    : '<div class="empty">No saved scenes yet. Scenes you save (💾 in the Library) show up here.</div>';
+  const cf = $('#homeConfirm');
+  if (homeConfirm) {
+    cf.style.display = '';
+    cf.innerHTML = `<b>“${esc(Lib.sceneName || 'Your current scene')}” has unsaved changes.</b> Save it before leaving?<div class="row" style="margin-top:8px"><button class="btn primary" data-cf="save">💾 Save, then continue</button><button class="btn danger" data-cf="discard">Don’t save</button><button class="btn" data-cf="cancel">Cancel</button></div>`;
+  } else cf.style.display = 'none';
+  $('#homeWhere').textContent = Lib.ready ? libWhere() : '';
+}
+$('#home').addEventListener('click', async e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.tpl) { const name = $('#homeName').value.trim(); guard(() => newScene(b.dataset.tpl, name)); return; }
+  if (b.dataset.home === 'continue') { closeHome(); return; }
+  if (b.dataset.open) { const id = b.dataset.open; guard(async () => { closeHome(); try { await loadScene(await libGet(id)); updateSceneTitle(); setTimeout(() => {}, 0); } catch (err) { setStatus('Couldn’t open that scene (' + ((err && (err.code || err.message)) || 'error') + ').', 'err'); } }); return; }
+  if (b.dataset.hdel) { if (b.dataset.confirm) { await libDel(b.dataset.hdel); renderHome(); } else { b.dataset.confirm = 1; b.textContent = 'Delete?'; setTimeout(() => { if (b.isConnected) { delete b.dataset.confirm; b.textContent = '🗑'; } }, 3000); } return; }
+  if (b.dataset.cf) {
+    const act = homeConfirm; homeConfirm = null;
+    if (b.dataset.cf === 'save') { b.disabled = true; const ok = await saveScene(); if (!ok) { renderHome(); return; } }
+    if (b.dataset.cf !== 'cancel' && act) await act(); else renderHome();
+    return;
+  }
+  if (b.id === 'homeOpenFile') $('#libFile').click();
+  if (b.id === 'homeLib') { closeHome(); openLibrary('scene'); }
+  if (b.id === 'homePC') { $('#pcBtn').click(); }
+});
+$('#homeName').addEventListener('keydown', e => { if (e.key === 'Enter') { const name = e.target.value.trim(); guard(() => newScene('one', name)); } });
+$('#menuBtn').onclick = () => openHome();
+$('#homePC').style.display = STANDALONE ? 'none' : '';
+$('#sceneTitle').addEventListener('click', () => {
+  const el = $('#sceneTitle'), cur = Lib.sceneName || 'Untitled scene';
+  if (el.querySelector('input')) return;
+  el.innerHTML = `<input value="${esc(cur)}" style="width:150px;background:var(--ink);border:1px solid var(--accent);border-radius:5px;padding:1px 5px;font-size:12px;text-transform:none;letter-spacing:0;color:var(--text)">`;
+  const i = el.querySelector('input'); i.focus(); i.select();
+  const done = ok => { if (!i.isConnected) return; if (ok && i.value.trim()) { Lib.sceneName = i.value.trim(); ST.set('pp3d.sceneId', { id: Lib.sceneId, name: Lib.sceneName }); } updateSceneTitle(); };
+  i.onkeydown = ev => { ev.stopPropagation(); if (ev.key === 'Enter') done(true); if (ev.key === 'Escape') done(false); };
+  i.onblur = () => done(true);
+}, { capture: false });
+
+/* ================= phone layout ================= */
+var mobile = false, mtab = null;
+const TABSEC = { build: 'secBuild', scene: 'secScene', edit: 'inspector', cam: 'secCam' };
+const LAYOUT_LABEL = { auto: 'Layout: Auto', mobile: 'Layout: Phone', desktop: 'Layout: Desktop' };
+function wantMobile() {
+  const pref = ST.get('pp3d.layout', 'auto');
+  if (pref !== 'auto') return pref === 'mobile';
+  const coarse = matchMedia('(pointer: coarse)').matches;
+  return innerWidth <= 760 || (coarse && innerWidth <= 1100);
+}
+function applyLayout(force) {
+  const m = wantMobile();
+  if (m === mobile && !force) return;
+  mobile = m; document.body.classList.toggle('mobile', m);
+  const camIn = $('#camIn');
+  if (m) $('#secCam').insertBefore(camIn, $('#mCamExtra')); else $('#cam').appendChild(camIn);
+  tc.setSize(m ? 1.35 : 0.85);
+  if (!m) closeSheet();
+  $('#homeLayout').textContent = LAYOUT_LABEL[ST.get('pp3d.layout', 'auto')];
+}
+function openSheet(tab) {
+  mtab = tab; document.body.classList.add('sheet-open');
+  for (const [k, id] of Object.entries(TABSEC)) $('#' + id).classList.toggle('mshow', k === tab);
+  $('#mtabs').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.t === tab));
+  if (tab === 'edit') $('#mtabEdit').classList.remove('dot');
+  $('#side').scrollTop = 0;
+}
+function closeSheet() {
+  mtab = null; document.body.classList.remove('sheet-open');
+  $('#mtabs').querySelectorAll('button').forEach(b => b.classList.remove('on'));
+}
+$('#mtabs').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const t = b.dataset.t;
+  if (t === 'snap') { $('#snapBtn').click(); return; }
+  if (mtab === t) closeSheet(); else openSheet(t);
+});
+$('#mtop').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.m === 'menu') { closeSheet(); openHome(); }
+  if (b.dataset.m === 'lib') openLibrary();
+});
+$('#mSnap').onclick = () => $('#snapBtn').click();
+$('#mGlb').onclick = () => $('#glbBtn').click();
+$('#homeLayout').onclick = () => {
+  const order = ['auto', 'mobile', 'desktop'], cur = ST.get('pp3d.layout', 'auto');
+  ST.set('pp3d.layout', order[(order.indexOf(cur) + 1) % 3]); applyLayout(true);
+};
+// a selection on the phone: switch an open sheet to Edit, or mark the Edit tab
+function mobileOnSelect() {
+  if (!mobile) return;
+  if (!sel) { $('#mtabEdit').classList.remove('dot'); return; }
+  if (mtab && mtab !== 'edit') openSheet('edit'); else if (!mtab) $('#mtabEdit').classList.add('dot');
+}
+addEventListener('resize', () => applyLayout());
+applyLayout(true);
+
+/* ================= persistence ================= */
+let saveT = null;
+function save() {
+  queueMicrotask(renderLibBadge);
+  LS.set('pp3d.scene', objects.filter(o => o.def.kind !== 'mesh').map(o => ({ def: o.def, pose: o.pose, name: o.name, vis: o.root.visible, libId: o.libId || undefined, sig: o.savedSig || undefined, t: { p: o.root.position.toArray(), q: o.root.quaternion.toArray(), s: o.root.scale.toArray() } })));
+}
+function saveSoon() { clearTimeout(saveT); saveT = setTimeout(save, 400); }
+
+/* ================= camera tools ================= */
+let roll = 0, guides = '2pt', tween = null;
+function tweenTo(pos, target, dur = 550) { tween = { p0: camera.position.clone(), t0: controls.target.clone(), p1: pos, t1: target, s: performance.now(), dur }; }
+function stepTween() {
+  if (!tween) return;
+  let u = clamp((performance.now() - tween.s) / tween.dur, 0, 1); const e = u < .5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
+  camera.position.lerpVectors(tween.p0, tween.p1, e); controls.target.lerpVectors(tween.t0, tween.t1, e);
+  if (u >= 1) tween = null;
+}
+function focusBox() {
+  const box = new THREE.Box3();
+  if (sel) box.setFromObject(sel.root); else for (const o of objects) if (o.root.visible) box.expandByObject(o.root);
+  if (box.isEmpty()) box.set(new V(-.4, 0, -.4), new V(.4, 1.8, .4));
+  return box;
+}
+function viewPreset(name) {
+  const box = focusBox(), c = box.getCenter(new V()), size = box.getSize(new V()), r = Math.max(size.length() / 2, 0.05);
+  const yaw = sel ? new THREE.Euler().setFromQuaternion(sel.root.quaternion, 'YXZ').y : 0;
+  const vfov = camera.fov * D2R, hfov = 2 * Math.atan(Math.tan(vfov / 2) * camera.aspect);
+  const dist = r / Math.sin(Math.min(vfov, hfov) / 2) * 1.02;
+  const A = { front: [0, 4], threeq: [38, 14], side: [90, 4], back: [180, 6], bird: [38, 52], top: [0, 89.5], eye: [32, 0], worm: [28, 0] }[name] || [38, 14];
+  const az = A[0] * D2R + yaw, el = A[1] * D2R;
+  const dir = new V(Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el));
+  let pos = c.clone().addScaledVector(dir, dist), tgt = c.clone();
+  if (name === 'eye') { const eyeY = box.max.y > 1.3 ? 1.6 : c.y; pos.y = eyeY; tgt = new V(c.x, eyeY, c.z); const h = new V(dir.x, 0, dir.z).normalize(); pos = tgt.clone().addScaledVector(h, dist * 1.05); pos.y = eyeY; }
+  if (name === 'worm') { const h = new V(dir.x, 0, dir.z).normalize(); pos = c.clone().addScaledVector(h, dist * 0.75); pos.y = Math.max(0.04, size.y * 0.04); tgt = new V(c.x, c.y + size.y * 0.15, c.z); }
+  tweenTo(pos, tgt);
+}
+$('#views').addEventListener('click', e => { const b = e.target.closest('[data-view]'); if (b) viewPreset(b.dataset.view); });
+$('#toggleSide').onclick = () => $('#app').classList.toggle('collapsed');
+function setFocal(mm, fromUser = true) {
+  const old = camera.getFocalLength();
+  camera.setFocalLength(mm); camera.updateProjectionMatrix();
+  if (fromUser && $('#dolly').checked && !tween) {
+    const off = camera.position.clone().sub(controls.target); off.multiplyScalar(mm / old); camera.position.copy(controls.target).add(off);
+  }
+  $('#focal').value = mm; $('#focalO').textContent = Math.round(mm) + 'mm';
+}
+$('#focal').addEventListener('input', e => setFocal(+e.target.value));
+document.querySelectorAll('[data-lens]').forEach(b => b.onclick = () => setFocal(+b.dataset.lens));
+$('#roll').addEventListener('input', e => { roll = +e.target.value * D2R; $('#rollO').textContent = e.target.value + '°'; });
+$('#gridT').onchange = e => grid.visible = e.target.checked;
+$('#headT').onchange = e => world.traverse(o => { if (o.userData.headLines) o.visible = e.target.checked; });
+$('#shadowT').onchange = e => { key.castShadow = e.target.checked; ground.visible = e.target.checked; };
+$('#style').onchange = e => setStyle(e.target.value);
+$('#bg').onchange = () => setStyle(style);
+function setLight() {
+  const az = +$('#laz').value * D2R, el = +$('#lel').value * D2R;
+  key.position.set(Math.sin(az) * Math.cos(el) * 20, Math.sin(el) * 20, Math.cos(az) * Math.cos(el) * 20);
+  $('#lazO').textContent = $('#laz').value + '°'; $('#lelO').textContent = $('#lel').value + '°';
+}
+$('#laz').oninput = setLight; $('#lel').oninput = setLight; setLight();
+$('#aspect').onchange = () => { };
+
+/* ================= overlay: horizon, vanishing points, panel frame ================= */
+let vw = 1, vh = 1, dpr = 1;
+function frameRect() {
+  const a = +$('#aspect').value; if (!a) return { x: 0, y: 0, w: vw, h: vh };
+  const m = 22, W = vw - 2 * m, H = vh - 2 * m - 52;
+  let w = W, h = w / a; if (h > H) { h = H; w = h * a; }
+  return { x: (vw - w) / 2, y: (vh - 52 - h) / 2 + 4, w, h };
+}
+const _v4 = new THREE.Vector4();
+function toScreen(p) { const v = p.clone().project(camera); return [(v.x * .5 + .5) * vw, (-v.y * .5 + .5) * vh]; }
+function inFront(p) { return p.clone().applyMatrix4(camera.matrixWorldInverse).z < -camera.near; }
+function vanishing(dir) {
+  _v4.set(dir.x, dir.y, dir.z, 0).applyMatrix4(camera.matrixWorldInverse).applyMatrix4(camera.projectionMatrix);
+  if (_v4.w < 0) _v4.multiplyScalar(-1);
+  if (_v4.w < 1e-4) return { inf: true, d: [_v4.x, -_v4.y] };
+  return { inf: false, x: (_v4.x / _v4.w * .5 + .5) * vw, y: (-_v4.y / _v4.w * .5 + .5) * vh };
+}
+function drawOverlay(forSnap = false) {
+  ov.setTransform(dpr, 0, 0, dpr, 0, 0); ov.clearRect(0, 0, vw, vh);
+  const fr = frameRect();
+  if (guides !== 'off') {
+    // horizon
+    const f = new V(); camera.getWorldDirection(f); f.y = 0;
+    if (f.lengthSq() > 1e-6) {
+      f.normalize(); const rgt = new V(-f.z, 0, f.x);
+      const A = camera.position.clone().addScaledVector(f, 5000); const B = A.clone().addScaledVector(rgt, 400);
+      const a = toScreen(A), b = toScreen(B), dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1;
+      ov.strokeStyle = '#ffb000'; ov.lineWidth = 1.6; ov.setLineDash([]);
+      ov.beginPath(); ov.moveTo(a[0] - dx / L * 5000, a[1] - dy / L * 5000); ov.lineTo(a[0] + dx / L * 5000, a[1] + dy / L * 5000); ov.stroke();
+      const tx = clamp(a[0] - dx / L * (a[0] - fr.x - 12), fr.x + 8, fr.x + fr.w - 150), ty = a[1] + dy / L * (tx - a[0]) / (dx / L || 1);
+      if (ty > -20 && ty < vh + 20) { ov.fillStyle = '#b37a00'; ov.font = '600 11px "IBM Plex Mono", monospace'; ov.fillText('HORIZON · eye level ' + camera.position.y.toFixed(2) + ' m', tx, ty - 6); }
+    }
+    // vanishing points from the selected (or first) object
+    const tgt = sel && sel.root.visible ? sel : objects.find(o => o.root.visible);
+    if (tgt && (guides === '2pt' || guides === '3pt')) {
+      const box = localBox(tgt.root, tgt.root, m => !m.userData.attach || true);
+      if (!box.isEmpty()) {
+        const M = tgt.root.matrixWorld, q = new THREE.Quaternion(); tgt.root.getWorldQuaternion(q);
+        const corners = []; for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) corners.push(new V(x, y, z).applyMatrix4(M));
+        const fams = [[new V(1, 0, 0), '#ff5a5f', 'VP1'], [new V(0, 0, 1), '#3aa0ff', 'VP2']];
+        if (guides === '3pt') fams.push([new V(0, 1, 0), '#22b35e', 'VP3']);
+        for (const [ax, col, lbl] of fams) {
+          const d = ax.clone().applyQuaternion(q), vp = vanishing(d);
+          ov.strokeStyle = col; ov.globalAlpha = .55; ov.lineWidth = 1; ov.setLineDash([]);
+          ov.beginPath();
+          for (const c of corners) {
+            if (!inFront(c)) continue; const p = toScreen(c);
+            if (vp.inf) { const L = Math.hypot(vp.d[0], vp.d[1]) || 1; ov.moveTo(p[0] - vp.d[0] / L * 4000, p[1] - vp.d[1] / L * 4000); ov.lineTo(p[0] + vp.d[0] / L * 4000, p[1] + vp.d[1] / L * 4000); }
+            else { const dx = p[0] - vp.x, dy = p[1] - vp.y, L = Math.hypot(dx, dy) || 1; ov.moveTo(vp.x, vp.y); ov.lineTo(p[0] + dx / L * Math.max(vw, vh) * .35, p[1] + dy / L * Math.max(vw, vh) * .35); }
+          }
+          ov.stroke(); ov.globalAlpha = 1;
+          if (!vp.inf && vp.x > -vw * 3 && vp.x < vw * 4 && vp.y > -vh * 3 && vp.y < vh * 4) {
+            const onScreen = vp.x > 0 && vp.x < vw && vp.y > 0 && vp.y < vh;
+            const px = clamp(vp.x, 14, vw - 14), py = clamp(vp.y, 14, vh - 64);
+            ov.fillStyle = col; ov.beginPath(); ov.arc(px, py, onScreen ? 5 : 4, 0, Math.PI * 2); ov.fill();
+            ov.font = '600 11px "IBM Plex Mono", monospace'; ov.fillText(lbl + (onScreen ? '' : ' →off'), px + 8 > vw - 70 ? px - 74 : px + 8, py - 7);
+          }
+        }
+      }
+    }
+  }
+  if (fr.w < vw - 1 || fr.h < vh - 1) {
+    if (!forSnap) {
+      ov.fillStyle = 'rgba(15,17,21,.55)';
+      ov.beginPath(); ov.rect(0, 0, vw, vh); ov.rect(fr.x, fr.y, fr.w, fr.h); ov.fill('evenodd');
+    }
+    ov.strokeStyle = '#111'; ov.lineWidth = forSnap ? 0 : 3; if (!forSnap) ov.strokeRect(fr.x, fr.y, fr.w, fr.h);
+  }
+}
+
+/* ================= HUD / loop ================= */
+let frameN = 0;
+function updateHud() {
+  const d = new V(); camera.getWorldDirection(d);
+  const pitch = Math.asin(clamp(d.y, -1, 1)) / D2R;
+  $('#hud').textContent = `${Math.round(camera.getFocalLength())}mm · camera ${camera.position.y.toFixed(2)} m high · tilt ${pitch > 0 ? '+' : ''}${pitch.toFixed(0)}° · ${camera.position.distanceTo(controls.target).toFixed(1)} m away`;
+}
+function resize() {
+  const r = stage.getBoundingClientRect(); vw = Math.max(r.width, 1); vh = Math.max(r.height, 1); dpr = Math.min(devicePixelRatio, 2);
+  renderer.setPixelRatio(dpr); renderer.setSize(vw, vh, false);
+  ovc.width = vw * dpr; ovc.height = vh * dpr;
+  camera.aspect = vw / vh; camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(stage); resize();
+function renderScene() {
+  if (style === 'comic' || style === 'ink') outline.render(scene, camera); else renderer.render(scene, camera);
+}
+function loop() {
+  requestAnimationFrame(loop);
+  stepTween(); controls.update();
+  if (roll) camera.rotateZ(roll);
+  renderScene(); drawOverlay();
+  if (++frameN % 6 === 0) updateHud();
+}
+
+/* ================= export ================= */
+function showModal(node) { const b = $('#modalBody'); b.innerHTML = ''; b.appendChild(node); $('#modal').classList.add('show'); }
+$('#modalClose').onclick = () => $('#modal').classList.remove('show');
+$('#modal').onclick = e => { if (e.target.id === 'modal') $('#modal').classList.remove('show'); };
+async function offerFile(blob, filename, isImage) {
+  if (STANDALONE) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); return; }
+  if (downloadsCap) {
+    try { await downloadsCap.save({ filename, data: blob }); return; } catch (e) { if (e && (e.code === 'declined' || e.code === 'cancelled')) return; }
+  }
+  const wrap = document.createElement('div');
+  if (isImage) {
+    const img = document.createElement('img'); img.src = URL.createObjectURL(blob); wrap.appendChild(img);
+    const p = document.createElement('p'); p.className = 'hint'; p.textContent = 'Right-click (or long-press) the image and choose "Save image".'; wrap.appendChild(p);
+  } else { const p = document.createElement('p'); p.textContent = 'File downloads aren’t available in this view.'; wrap.appendChild(p); }
+  showModal(wrap);
+}
+$('#snapBtn').onclick = () => {
+  const tcVis = tc.visible; tc.visible = false;
+  renderScene(); drawOverlay(true);
+  const fr = frameRect(), c = document.createElement('canvas');
+  c.width = Math.round(fr.w * dpr); c.height = Math.round(fr.h * dpr);
+  const x = c.getContext('2d');
+  x.drawImage(glc, fr.x * dpr, fr.y * dpr, fr.w * dpr, fr.h * dpr, 0, 0, c.width, c.height);
+  x.drawImage(ovc, fr.x * dpr, fr.y * dpr, fr.w * dpr, fr.h * dpr, 0, 0, c.width, c.height);
+  tc.visible = tcVis;
+  c.toBlob(b => offerFile(b, `perspective-ref-${Date.now()}.png`, true), 'image/png');
+};
+$('#glbBtn').onclick = async () => {
+  const prev = style; if (prev !== 'color') setStyle('color');
+  const exp = new GLTFExporter();
+  const clone = new THREE.Group(); world.children.forEach(r => { if (r.visible) clone.add(r.clone(true)); });
+  clone.traverse(o => { if (o.userData.headLines) o.visible = false; });
+  try {
+    const glb = await exp.parseAsync(clone, { binary: true, onlyVisible: true });
+    await offerFile(new Blob([glb], { type: 'model/gltf-binary' }), 'perspective-scene.glb', false);
+  } catch { setStatus('Export failed.', 'err'); }
+  if (prev !== 'color') setStyle(prev);
+};
+
+/* ================= keyboard ================= */
+addEventListener('keydown', e => {
+  if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
+  const k = e.key.toLowerCase();
+  if (k === 'q') setMode('pose'); else if (k === 'w') setMode('translate'); else if (k === 'e') setMode('rotate'); else if (k === 'r') setMode('scale');
+  else if (k === 'f') viewPreset('threeq');
+  else if ((k === 'delete' || k === 'backspace') && sel) removeObject(sel);
+  else if (k === 'escape') select(null);
+});
+
+/* ================= boot ================= */
+const saved = LS.get('pp3d.scene', null);
+const hadSavedScene = !!(saved && saved.length);
+{ const s0 = ST.get('pp3d.sceneId', null); if (s0) { Lib.sceneId = s0.id; Lib.sceneName = s0.name; } }
+if (saved && saved.length) {
+  for (const s of saved) { try { const o = addObject({ ...s.def, pose: s.pose, name: s.name }, { t: s.t, silent: true }); o.root.visible = s.vis !== false; o.libId = s.libId || null; o.savedSig = s.sig || null; } catch { } }
+  renderList();
+}
+setStyle('color'); renderInspector(); renderList();
+setTimeout(() => viewPreset('threeq'), 50);
+loop();
+updateSceneTitle(); openHome();
+// Library: connect storage, then keep a copy of the scene you were working on before this update
+libInit().then(async () => {
+  if (Lib.sceneId && Lib.items.some(x => x.id === Lib.sceneId)) {
+    // the scene in the browser was last saved as this item; it counts as saved only if nothing changed since
+    Lib.sceneSig = ST.get('pp3d.sceneSig', null);
+  }
+  if (hadSavedScene && !ST.get('pp3d.migrated', false) && Lib.mode !== 'mem') {
+    const ok = await saveScene(true, 'My scene (auto-saved ' + new Date().toLocaleDateString([], { month: 'short', day: 'numeric' }) + ')');
+    if (ok) { ST.set('pp3d.migrated', true); setStatus('Your current scene was saved to the Library ✓ (📚 Library at the top).'); }
+  }
+  renderInspector(); renderLibBadge(); renderHome(); updateSceneTitle();
+});
+addEventListener('keydown', e => { if (e.key.toLowerCase() === 'l' && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName) && !e.metaKey && !e.ctrlKey) openLibrary(); });
+</script>
+<script>if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});</script>
+</body>
+</html>

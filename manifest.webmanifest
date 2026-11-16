@@ -1,0 +1,16 @@
+{
+  "name": "Perspective Puppet",
+  "short_name": "Puppet",
+  "description": "3D reference for drawing comics: pose figures, set up props, find the camera angle.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f1115",
+  "theme_color": "#0f1115",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
