@@ -154,6 +154,10 @@ textarea:focus{border-color:var(--accent)}
 .dt{font-size:11px;color:var(--mute)}
 .lcard .acts{display:flex;flex-wrap:wrap;gap:4px;margin-top:7px}
 .lcard .acts .btn{padding:3px 8px;font-size:12px}
+.syncbox{max-width:680px}
+.syncsteps{display:flex;flex-direction:column;gap:10px}
+.ss{display:flex;gap:12px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px}
+.sn{width:28px;height:28px;border-radius:50%;background:var(--accent);color:#111;font-weight:800;display:grid;place-items:center;flex:none}
 .urow{display:flex;align-items:center;gap:8px;padding:7px 9px;border:1px solid var(--line);border-radius:10px;margin-bottom:6px;background:var(--panel2);flex-wrap:wrap}
 .urow img{width:56px;height:42px;object-fit:cover;border-radius:6px;background:#e9e6df}
 .urow .ic2{width:42px;height:42px;display:grid;place-items:center;font-size:20px;background:var(--ink);border-radius:8px}
@@ -387,6 +391,7 @@ body.mobile.dragging #stage::after{font-size:16px}
     <div class="row homefoot">
       <button class="btn" id="homeOpenFile" type="button">⬆ Open a file…</button>
       <button class="btn" id="homeLib" type="button">📚 Library</button>
+      <button class="btn" id="homeSync" type="button">⇅ Sync devices</button>
       <button class="btn" id="homePC" type="button">💻 Get the PC version</button>
       <button class="btn" id="homeLayout" type="button" title="Switch between the phone and desktop layouts">Layout: Auto</button>
       <span class="hint" id="homeWhere" style="margin:0 0 0 auto"></span>
@@ -1753,7 +1758,7 @@ async function buildShapeFromRefs(q, note = '') {
 
 /* ================= Library: saved scenes, poses, objects/models, references ================= */
 const Lib = { mode: 'mem', db: null, uid: null, idb: null, mem: new Map(), items: [], ready: false, sceneId: null, sceneName: '', sceneSig: null };
-const LIB_TABS = [['current', 'Current work'], ['scene', 'Scenes'], ['pose', 'Poses'], ['object', 'Objects & models'], ['reference', 'References']];
+const LIB_TABS = [['current', 'Current work'], ['scene', 'Scenes'], ['pose', 'Poses'], ['object', 'Objects & models'], ['reference', 'References'], ['sync', '⇅ Sync devices']];
 let libTab = 'current';
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const CHUNK = 150000;
@@ -1786,7 +1791,7 @@ async function libRefresh() {
 }
 async function libPut(it) {
   const now = Date.now();
-  const rec = { rec: 'item', id: it.id || newId(), type: it.type, name: String(it.name || 'Untitled').slice(0, 80), created: it.created || now, updated: now, thumb: it.thumb || '' };
+  const rec = { rec: 'item', id: it.id || newId(), type: it.type, name: String(it.name || 'Untitled').slice(0, 80), created: it.created || now, updated: it.keepTime && it.updated ? it.updated : now, thumb: it.thumb || '' };
   const payload = JSON.stringify({ data: it.data ?? null, big: it.big || '' });
   if (Lib.mode === 'db') {
     const col = Lib.col(), n = Math.max(1, Math.ceil(payload.length / CHUNK)), prev = Lib.items.find(x => x.id === rec.id);
@@ -1983,6 +1988,36 @@ async function downloadScene() {
   return offerFile(jsonBlob({ app: 'perspective-puppet', v: 1, type: 'scene', name: Lib.sceneName || 'Scene', data: { objects: objects.map(o => ({ def: o.def.kind === 'mesh' ? { kind: 'mesh', name: o.name, parts: [] } : o.def, pose: o.pose, name: o.name, vis: o.root.visible, t: serT(o) })), camera: { p: camera.position.toArray(), t: controls.target.toArray(), f: camera.getFocalLength(), roll: +$('#roll').value } }, big: Object.keys(meshes).length ? JSON.stringify(meshes) : undefined }), fileSafe(Lib.sceneName || 'scene') + '.scene.json', false);
 }
 async function downloadRef(r) { return r.kind === 'image' ? offerFile(r.blob, fileSafe(r.name.replace(/\.[^.]+$/, '')) + '.jpg', true) : offerFile(new Blob([r.text], { type: 'text/plain' }), fileSafe(r.name) + '.txt', false); }
+// Two-way sync by file: every item keeps its id across devices, and the newer copy wins.
+async function mergeItems(items, from) {
+  if (!Lib.ready) { setStatus('Your library is still loading. Try again in a moment.', 'err'); return; }
+  let added = 0, updated = 0, same = 0, failed = 0;
+  setStatus(`Merging ${items.length} item${items.length === 1 ? '' : 's'}…`);
+  for (const it of items) {
+    if (!it || !it.type || !it.id) continue;
+    const mine = Lib.items.find(x => x.id === it.id);
+    if (mine && (mine.updated || 0) >= (it.updated || 0)) { same++; continue; }
+    try { await libPut({ ...it, keepTime: true }); mine ? updated++ : added++; }
+    catch (e) { failed++; libErr(e, `“${it.name}”`); if (e && e.code === 'quota_exceeded') break; }
+  }
+  ST.set('pp3d.lastSync', { at: Date.now(), dir: 'in', from });
+  const parts = [];
+  if (added) parts.push(`${added} new`); if (updated) parts.push(`${updated} updated`); if (same) parts.push(`${same} already up to date`);
+  setStatus(`Sync file loaded${from ? ' (from ' + from + ')' : ''}: ${parts.join(', ') || 'nothing to add'}${failed ? `, ${failed} couldn’t be saved` : ''}.`, failed ? 'err' : '');
+  renderLibrary(); renderHome();
+}
+const deviceName = () => STANDALONE ? (window.PP_WEBAPP ? (/iPhone|iPad|Android/i.test(navigator.userAgent) ? 'phone app' : 'web app') : 'PC version') : 'Claude app';
+async function exportSyncFile() {
+  if (!Lib.ready) { setStatus('Your library is still loading. Try again in a moment.', 'err'); return; }
+  if ($('#syncSaveFirst') && $('#syncSaveFirst').checked) await saveEverything();
+  setStatus('Packing your library…');
+  const items = []; for (const m of Lib.items) { try { items.push(await libGet(m.id)); } catch { } }
+  const d = new Date(), stamp = d.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).replace(/[^\w ]+/g, '').replace(/\s+/g, '-');
+  await offerFile(jsonBlob({ app: 'perspective-puppet', v: 1, type: 'backup', sync: true, device: deviceName(), created: Date.now(), items }), `perspective-puppet-sync-${stamp}.json`, false);
+  ST.set('pp3d.lastSync', { at: Date.now(), dir: 'out' });
+  setStatus(`Sync file ready with ${items.length} item${items.length === 1 ? '' : 's'}. Open it in Perspective Puppet on your other device (⇅ Sync → Load sync file).`);
+  renderLibrary();
+}
 async function backupAll() {
   setStatus('Packing your library…');
   const items = []; for (const m of Lib.items) { try { items.push(await libGet(m.id)); } catch { } }
@@ -1990,10 +2025,7 @@ async function backupAll() {
   setStatus(`Backed up ${items.length} item${items.length === 1 ? '' : 's'}.`);
 }
 async function importLibraryJson(j, fname) {
-  if (j.type === 'backup') {
-    let n = 0; for (const it of (j.items || [])) { if (!it || !it.type) continue; try { await libPut({ ...it, id: Lib.items.some(x => x.id === it.id) ? null : it.id }); n++; } catch (e) { libErr(e, 'an item'); break; } }
-    setStatus(`Restored ${n} item${n === 1 ? '' : 's'} from the backup.`); openLibrary('scene'); return;
-  }
+  if (j.type === 'backup') { await mergeItems(j.items || [], j.device || ''); return; }
   if (!['scene', 'pose', 'object'].includes(j.type)) throw new Error('unknown');
   let id = null;
   try { id = await libPut({ type: j.type, name: j.name || fname, thumb: j.thumb || '', data: j.data, big: j.big || '' }); } catch (e) { libErr(e, `“${j.name || fname}”`); }
@@ -2008,10 +2040,25 @@ const typeIcon = { scene: '🎬', pose: '🤸', object: '📦', reference: '🖼
 function renderLibrary() {
   if (!$('#libModal').classList.contains('show')) return;
   $('#libWhere').textContent = Lib.ready ? libWhere() : 'Loading your library…';
-  const counts = { current: unsavedCount() };
+  const counts = { current: unsavedCount(), sync: 0 };
   for (const t of ['scene', 'pose', 'object', 'reference']) counts[t] = Lib.items.filter(x => x.type === t).length;
-  $('#libTabs').innerHTML = LIB_TABS.map(([k, l]) => `<button data-tab="${k}" class="${k === libTab ? 'on' : ''}">${l}${k === 'current' ? (counts.current ? ` <span class="pill">${counts.current} unsaved</span>` : ' ✓') : ` (${counts[k]})`}</button>`).join('');
+  $('#libTabs').innerHTML = LIB_TABS.map(([k, l]) => `<button data-tab="${k}" class="${k === libTab ? 'on' : ''}">${l}${k === 'sync' ? '' : k === 'current' ? (counts.current ? ` <span class="pill">${counts.current} unsaved</span>` : ' ✓') : ` (${counts[k]})`}</button>`).join('');
   const B = $('#libBody');
+  if (libTab === 'sync') {
+    const ls = ST.get('pp3d.lastSync', null);
+    const here = deviceName();
+    B.innerHTML = `<div class="syncbox">
+      <p style="margin:0 0 10px">Move your saved scenes, poses, objects and references between the <b>Claude app</b>, the <b>phone app</b> and the <b>PC version</b>. You’re in the <b>${esc(here)}</b> right now.</p>
+      <div class="syncsteps">
+        <div class="ss"><div class="sn">1</div><div><b>Save a sync file here</b><br><span class="dt">Packs everything in this device’s library into one file.</span><label class="check" style="margin-top:6px"><input type="checkbox" id="syncSaveFirst" checked> Save my unsaved work into the library first</label><button class="btn primary" data-act="sync-out" style="margin-top:8px">⬇ Save sync file</button></div></div>
+        <div class="ss"><div class="sn">2</div><div><b>Open it on your other device</b><br><span class="dt">There, open 📚 Library → ⇅ Sync devices and load the file. New items are added, and for anything saved on both, the newest version wins. Nothing is deleted.</span><button class="btn" data-act="sync-in" style="margin-top:8px">⬆ Load sync file</button></div></div>
+        <div class="ss"><div class="sn">3</div><div><b>Going both ways?</b><br><span class="dt">Do the same in the other direction. Afterwards both devices have everything.</span></div></div>
+      </div>
+      <div class="hint" style="margin-top:12px"><b>Tip:</b> save sync files to <b>iCloud Drive</b> (on iPhone: Share → Save to Files → iCloud Drive; on a PC: the iCloud Drive folder from iCloud for Windows, or any synced folder like Google Drive or OneDrive). Then the newest file is already waiting on your other device.${ls ? `<br>Last sync on this device: ${ls.dir === 'out' ? 'saved a file' : 'loaded a file' + (ls.from ? ' from the ' + esc(ls.from) : '')}, ${fmtDate(ls.at)}.` : ''}</div>
+      <div class="hint">Deleting something only removes it on that device. Automatic syncing isn’t possible here, because the Claude app keeps its library in your Claude account, which the PC and phone versions can’t reach.</div>
+    </div>`;
+    return;
+  }
   if (libTab === 'current') {
     const pill = ok => ok ? '<span class="pill ok">Saved</span>' : '<span class="pill">Unsaved</span>';
     let h = `<div class="sub" style="margin-top:0">This scene</div>`;
@@ -2043,7 +2090,9 @@ $('#libBody').addEventListener('click', async e => {
   const a = b.dataset.act, id = b.dataset.id, o = b.dataset.oid ? objects.find(x => x.id === +b.dataset.oid) : null, r = b.dataset.rid ? refs.find(x => x.uid === b.dataset.rid) : null;
   b.disabled = true;
   try {
-    if (a === 'scene-save') await saveScene();
+    if (a === 'sync-out') await exportSyncFile();
+    else if (a === 'sync-in') $('#libFile').click();
+    else if (a === 'scene-save') await saveScene();
     else if (a === 'scene-saveas') await saveScene(true, (Lib.sceneName || 'Scene') + ' copy');
     else if (a === 'scene-dl') await downloadScene();
     else if (a === 'obj-save' && o) await saveObject(o);
@@ -2142,6 +2191,7 @@ $('#home').addEventListener('click', async e => {
   }
   if (b.id === 'homeOpenFile') $('#libFile').click();
   if (b.id === 'homeLib') { closeHome(); openLibrary('scene'); }
+  if (b.id === 'homeSync') { openLibrary('sync'); }
   if (b.id === 'homePC') { $('#pcBtn').click(); }
 });
 $('#homeName').addEventListener('keydown', e => { if (e.key === 'Enter') { const name = e.target.value.trim(); guard(() => newScene('one', name)); } });
