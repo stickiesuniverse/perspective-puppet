@@ -299,6 +299,7 @@ body.mobile.dragging #stage::after{font-size:16px}
         </div>
         <div class="hint" id="refHint">Drop, paste or pick photos, sketches, turnarounds, a PDF or notes, and the model is built to match them. You can leave the search box empty. 3D files (.glb .obj .stl .fbx .ply) load straight into the scene.</div>
       </div>
+      <label class="check" style="margin-top:8px" title="After the first build, a second AI pass adds the inside (seats, dashboards, rooms) and small details. Takes about twice as long."><input type="checkbox" id="detailPass"> Extra detail pass (insides and fine details, slower)</label>
       <div class="chips" id="chips"></div>
       <div class="status" id="status"></div>
       <div class="chips" id="recent"></div>
@@ -927,7 +928,7 @@ function renderInspector() {
   if (o.def.kind !== 'mesh') {
     h += `<div class="sub">Change it with words ${aiReady() ? '' : '<span class="badge lib">needs AI</span>'}</div><textarea id="refineT" placeholder="${o.kind === 'character' ? 'e.g. add a long trench coat and fedora, make her sit cross-legged' : 'e.g. make it a convertible, add a roof rack'}"></textarea>`;
     if (refs.length) h += `<label class="check" style="margin-top:5px"><input type="checkbox" id="refineUseRefs" checked> Use my ${refs.length} reference${refs.length > 1 ? 's' : ''}</label>`;
-    h += `<div class="row" style="margin-top:6px"><button class="btn primary" data-act="refine" ${aiReady() ? '' : 'disabled'}>Apply change</button></div>`;
+    h += `<div class="row" style="margin-top:6px"><button class="btn primary" data-act="refine" ${aiReady() ? '' : 'disabled'}>Apply change</button><button class="btn" data-act="detail" ${aiReady() ? '' : 'disabled'} title="Adds the interior and small details. Type a focus in the box (like \u201cthe seats\u201d) or leave it empty.">✨ Add more detail</button></div>`;
   }
   el.innerHTML = h;
   el.querySelector('h2 .nm').textContent = o.name;
@@ -987,6 +988,16 @@ $('#inspector').addEventListener('click', async e => {
   if (a === 'mirror') { const p = {}; for (const [k, v] of Object.entries(o.pose)) p[k.endsWith('_l') ? k.slice(0, -2) + '_r' : k.endsWith('_r') ? k.slice(0, -2) + '_l' : k] = TORSO.has(k) && v ? { ...v, y: -num(v.y), z: -num(v.z) } : v; o.pose = p; applyPose(o); syncJointSliders(true); save(); }
   if (a === 'resetpose') { o.pose = {}; applyPose(o); syncJointSliders(true); renderInspector(); save(); }
   if (a === 'resetjoint' && selBone) { delete o.pose[selBone]; applyPose(o); syncJointSliders(true); save(); }
+  if (a === 'detail') {
+    t.disabled = true;
+    try {
+      const focus = $('#refineT').value.trim();
+      const useRefs = !!($('#refineUseRefs') && $('#refineUseRefs').checked);
+      const def = await generate(focus, o.kind, { ...o.def, pose: o.kind === 'character' ? o.pose : undefined }, { detailOnly: true, useRefs });
+      if (def) { o.def = def; if (def.kind === 'character' && def.pose) o.pose = def.pose; rebuild(o); renderInspector(); save(); }
+    } finally { t.disabled = false; }
+    return;
+  }
   if (a === 'refine') {
     const useR = !!($('#refineUseRefs') && $('#refineUseRefs').checked && refs.length);
     const txt = $('#refineT').value.trim() || (useR ? 'Make it match the reference more closely.' : ''); if (!txt) return;
@@ -1057,7 +1068,7 @@ async function aiCall(prompt, { images = [], onText, signal, quality, nocache, j
     const c = aiCfg.ollama, url = c.url.replace(/\/+$/, '');
     let res;
     try { res = await fetch(url + '/api/chat', { method: 'POST', signal, headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: c.model, stream: true, format: json ? 'json' : undefined, options: { temperature: 0.4, num_ctx: 16384 },
+      body: JSON.stringify({ model: c.model, stream: true, format: json ? 'json' : undefined, options: { temperature: 0.4, num_ctx: 32768, num_predict: -1 },
         messages: [{ role: 'user', content: prompt, images: imgs.length ? imgs.map(d => d.split(',')[1]) : undefined }] }) }); }
     catch (e) { netFail(e, 'Ollama', url); }
     if (!res.ok) await httpFail(res, 'Ollama');
@@ -1071,7 +1082,7 @@ async function aiCall(prompt, { images = [], onText, signal, quality, nocache, j
     let res;
     try { res = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', signal,
       headers: { 'content-type': 'application/json', 'x-api-key': c.key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-      body: JSON.stringify({ model, max_tokens: 16000, stream: true, messages: [{ role: 'user', content }] }) }); }
+      body: JSON.stringify({ model, max_tokens: 32000, stream: true, messages: [{ role: 'user', content }] }) }); }
     catch (e) { netFail(e, 'Claude', 'api.anthropic.com'); }
     if (!res.ok) {
       let body = ''; try { body = await res.text(); } catch { }
@@ -1234,7 +1245,11 @@ SHAPES ("size" is always the full extent [x,y,z] before rotation):
 - "wedge": a ramp, full height along its -Z edge sloping down to zero at its +Z edge
 Orientation tips: a wheel = cylinder with rot [0,0,90]; a ring lying flat = torus with rot [90,0,0].
 
-PART: {"name":"short label","shape":"...","size":[x,y,z],"pos":[x,y,z],"rot":[x,y,z],"color":"#rrggbb"} plus optional "taper","arc","metal":true,"opacity":0.15-1 (glass).
+PART FORMAT (compact, preferred, so you can fit many parts): each part is an array
+ [shape, [sizeX,sizeY,sizeZ], [posX,posY,posZ], [rotX,rotY,rotZ] or 0, "#rrggbb", {extras}]
+ extras are optional: "taper", "arc", "metal":true, "opacity":0.15-1 (glass), "bone" (characters, required there), "name".
+ e.g. ["cylinder",[0.66,0.24,0.66],[0.82,0.33,1.35],[0,0,90],"#1d1d1f",{"name":"front left tire"}]
+ (The object form {"shape":..,"size":..,"pos":..,"rot":..,"color":..} is also accepted.)
 
 TWO KINDS:
 A) PROP: anything not humanoid: furniture, vehicles, buildings, rooms, weapons, tools, animals, creatures, plants, food, machines.
@@ -1243,7 +1258,7 @@ Real-world scale, resting on the ground (lowest point y=0), centered on x=0,z=0,
 
 B) CHARACTER: any humanoid (person, superhero, knight, robot, alien, zombie, elf, etc.).
 {"kind":"character","name":"...","body":{...},"pose":{...},"parts":[...]}
-The app supplies a posable mannequin body. DO NOT model the body or limbs themselves. "parts" are only what is ON the body: hair, hats, helmets, masks, clothing, armor, capes, belts, boots, gloves, backpacks, held items, tails, wings, horns, robot plating. Every character part MUST have "bone".
+The app supplies a posable mannequin body. DO NOT model the body or limbs themselves. "parts" are only what is ON the body: hair, hats, helmets, masks, clothing, armor, capes, belts, boots, gloves, backpacks, held items, tails, wings, horns, robot plating. Every character part MUST have "bone" (in the compact format, put it in extras, e.g. {"bone":"head"}).
 body: {"height":meters, "heads":2.5-9 (head-heights tall: 7.5 normal adult, 8-8.5 heroic, 6.5-7 teen, 5-5.5 child, 3 chibi), "build":0.6-1.8 (1 average, 1.6+ hulking), "shoulders":0.7-1.5, "hips":0.7-1.4, "bust":0-1, "skin":"#hex"}
 
 BONES: each part's pos/rot/size are in that bone's local frame, authored for the REFERENCE body (1.8 m, 7.5 heads, average build) in rest pose (standing straight, arms hanging at the sides). The app rescales parts to the actual body.
@@ -1271,7 +1286,11 @@ POSE: degrees per joint; omit joints that stay at 0. Joints: hips (rotates the w
  Sitting on a chair: {"thigh_l":{"x":90},"thigh_r":{"x":90},"shin_l":{"x":90},"shin_r":{"x":90}}
  If no pose is requested, give a neutral stance that suits the character.
 
-QUALITY: an artist draws from this, so silhouette, proportions and real-world scale matter most. Capture distinctive features (a car's wheels, windows and lights; a chair's legs; a building's windows and door; a creature's legs, tail and head shape). Use 10-80 parts. Round numbers to 3 decimals. Use plausible mid-tone colors.`;
+QUALITY: an artist draws from this, so silhouette, proportions and real-world scale matter most, and detail is what makes it useful.
+- ENCLOSED THINGS ARE HOLLOW: vehicles, buildings, rooms, aircraft, boats, cabinets, cases and anything with windows or openings must be built from panels (floor, walls/sides, roof, pillars) so the inside is empty, never one solid block. Glass and windows use "opacity" 0.25-0.35 so the interior shows through.
+- MODEL THE INSIDE, not just the shell. Car: front and rear seats (cushion + backrest + headrest each), steering wheel on its column, dashboard with instrument cluster and air vents, center console with gear lever, pedals, door panels with handles and armrests, rear-view mirror, floor mats. Building or room: floors, interior walls, doors, stairs, furniture. Aircraft or ship: cockpit seats, controls, cabin. Cabinet or bag: shelves, compartments, contents.
+- EXTERIOR DETAIL: everything an artist would draw: vehicles get wheels made of tire + rim + hub (+ visible brake disc), headlights and taillights with lenses, grille, bumpers, side mirrors, door handles, wipers, license plates, exhaust; furniture gets cushions, seams, legs and feet, drawer pulls; weapons and tools get grips, guards, fittings, screws; creatures get eyes, teeth, claws, ears, tail segments.
+- Round numbers to 3 decimals. Use plausible colors.`;
 
 const round3 = (k, v) => typeof v === 'number' ? Math.round(v * 1000) / 1000 : v;
 const SIDES = `Careful with sides: when a figure faces the camera, the character's LEFT (_l) appears on the IMAGE's RIGHT.`;
@@ -1291,8 +1310,8 @@ function refBlock(nImg, notes, copyPose, mode) {
   for (const n of notes) s += `\n\nNOTES FROM THE FILE "${n.name}":\n${n.text}`;
   return s;
 }
-const STYLE_BLOCKY = `\n\nSTYLE: BLOCKY. A clean, simple blockout that reads well at a glance: favor boxes and simple shapes, 10-60 parts.`;
-const STYLE_REAL = `\n\nSTYLE: REALISTIC. The user wants a lifelike, organic model that is easy to draw from, not a blocky blockout. Sculpt curves by layering several overlapping rounded primitives (spheres, capsules, tapered cylinders, tori, hemispheres); boxes get rounded edges automatically, so use them only where the real object is boxy. Get true proportions and silhouettes, include the small features an artist would draw (handles, seams, trims, buttons, laces, panel lines, rims), and use natural, realistic colors. Use 40-150 parts. For CHARACTERS the app supplies a realistic sculpted body: clothing should hug it closely (just slightly larger than the body part it covers) with collars, cuffs, hems and a few folds; build hair from several overlapping masses that follow the head shape; shoes should be shaped, not boxes.`;
+const STYLE_BLOCKY = `\n\nSTYLE: BLOCKY. A clean, simple blockout that reads well at a glance: favor boxes and simple shapes, 20-90 parts, still including the main interior pieces of enclosed things (seats, steering wheel, furniture).`;
+const STYLE_REAL = `\n\nSTYLE: REALISTIC. The user wants a lifelike, organic model that is easy to draw from, not a blocky blockout. Sculpt curves by layering several overlapping rounded primitives (spheres, capsules, tapered cylinders, tori, hemispheres); boxes get rounded edges automatically, so use them only where the real object is boxy. Get true proportions and silhouettes, include the small features an artist would draw (handles, seams, trims, buttons, laces, panel lines, rims), and use natural, realistic colors. Use 80-250 parts, and remember the interior. For CHARACTERS the app supplies a realistic sculpted body: clothing should hug it closely (just slightly larger than the body part it covers) with collars, cuffs, hems and a few folds; build hair from several overlapping masses that follow the head shape; shoes should be shaped, not boxes.`;
 function buildPrompt(q, kind, base, x = {}) {
   const rb = (x.poseOnly ? '' : (modelStyle === 'realistic' ? STYLE_REAL : STYLE_BLOCKY)) + refBlock(x.nImg || 0, x.notes || [], x.copyPose, x.poseOnly ? 'pose' : 'build');
   if (x.poseOnly) return `${SPEC}${rb}\n\nTASK: This is an existing CHARACTER (JSON below). Look at the human figure in the reference image and work out its pose, joint by joint, in this app's pose convention (hips/whole-body lean, spine, chest, neck, head, both shoulders, elbows, wrists, hips, knees, ankles, plus "lift" if they are airborne). ${SIDES} Body: ${JSON.stringify(base.body || {}, round3)}\nReturn ONLY {"pose":{...}}.`;
@@ -1307,29 +1326,48 @@ function normPose(p) {
   }
   return pose;
 }
+function closeJson(t) {
+  // append the brackets needed to close a cut-off JSON prefix
+  const st = []; let inS = false, esc2 = false;
+  for (const ch of t) {
+    if (inS) { if (esc2) esc2 = false; else if (ch === '\\') esc2 = true; else if (ch === '"') inS = false; continue; }
+    if (ch === '"') inS = true; else if (ch === '{' || ch === '[') st.push(ch); else if (ch === '}' || ch === ']') st.pop();
+  }
+  return t + st.reverse().map(c => c === '{' ? '}' : ']').join('');
+}
 function parseModel(text) {
   let t = String(text || '').replace(/```(?:json)?/gi, '');
   const a = t.indexOf('{'); if (a < 0) throw new Error('no json');
   t = t.slice(a);
   const b = t.lastIndexOf('}');
   try { return JSON.parse(t.slice(0, b + 1)); } catch { }
-  // repair a truncated parts array
-  const pi = t.indexOf('"parts"');
-  if (pi >= 0) {
-    let cut = t.lastIndexOf('}', t.length);
-    while (cut > pi) {
-      const attempt = t.slice(0, cut + 1) + ']}';
-      try { return JSON.parse(attempt); } catch { }
-      cut = t.lastIndexOf('}', cut - 1);
-    }
+  // the reply was cut off: keep every complete part and close the brackets
+  let cut = t.length, tries = 0;
+  while (cut > 0 && tries++ < 600) {
+    const i = Math.max(t.lastIndexOf('],', cut - 1), t.lastIndexOf('},', cut - 1));
+    if (i < 0) break;
+    try { return JSON.parse(closeJson(t.slice(0, i + 1))); } catch { }
+    cut = i;
   }
   throw new Error('bad json');
+}
+// compact part arrays <-> part objects
+function fromCompact(a) {
+  if (!Array.isArray(a)) return a;
+  const x = (a[5] && typeof a[5] === 'object') ? a[5] : {};
+  return { ...x, shape: a[0], size: a[1], pos: a[2], rot: Array.isArray(a[3]) ? a[3] : undefined, color: a[4] };
+}
+function toCompact(p) {
+  const x = {}; for (const k of ['taper', 'arc', 'metal', 'opacity', 'bone', 'name']) if (p[k] != null && p[k] !== false) x[k] = p[k];
+  const arr = [p.shape, p.size, p.pos, p.rot && p.rot.some(v => v) ? p.rot : 0, p.color];
+  if (Object.keys(x).length) arr.push(x);
+  return arr;
 }
 function normalize(def, kindPref) {
   if (!def || typeof def !== 'object') throw new Error('empty');
   const out = { kind: (def.kind === 'character' || (kindPref === 'character' && def.kind !== 'prop')) ? 'character' : 'prop', name: String(def.name || 'Model').slice(0, 60) };
-  const parts = Array.isArray(def.parts) ? def.parts : [];
-  out.parts = parts.filter(p => p && typeof p === 'object' && Array.isArray(p.size)).slice(0, 220).map(p => {
+  const parts = (Array.isArray(def.parts) ? def.parts : []).map(fromCompact);
+  out.parts = parts.filter(p => p && typeof p === 'object' && Array.isArray(p.size)).slice(0, 700).map(p => {
     const q = { shape: String(p.shape || 'box'), size: p.size.slice(0, 3).map(v => num(v, 0.05)), pos: (Array.isArray(p.pos) ? p.pos : [0, 0, 0]).slice(0, 3).map(v => num(v)), color: normColor(p.color) };
     if (Array.isArray(p.rot)) q.rot = p.rot.slice(0, 3).map(v => num(v));
     for (const k of ['taper', 'arc', 'opacity']) if (p[k] != null) q[k] = num(p[k], 1);
@@ -1342,6 +1380,41 @@ function normalize(def, kindPref) {
     out.pose = normPose(def.pose);
   } else if (!out.parts.length) throw new Error('no parts');
   return out;
+}
+const countParts = t => (t.match(/\["(?:box|sphere|ellipsoid|hemisphere|cylinder|tube|cone|pyramid|capsule|torus|wedge|ramp)"|"shape"/g) || []).length;
+const wantDetailPass = () => { const c = $('#detailPass'); return !!(c && c.checked); };
+const DETAIL_FOCUS_PROP = 'the interior and every small detail that is still missing';
+const DETAIL_FOCUS_CHAR = 'clothing detail (seams, collars, cuffs, hems, buttons, zips, pockets, belts and buckles, a few folds), accessories and gear, layered hair masses, eyebrows, and shaped shoes';
+// A second AI pass that adds interior and fine detail to a model; returns the merged model.
+async function detailPass(def, focus, { signal, quality, images = [], onText } = {}) {
+  const isChar = def.kind === 'character';
+  const list = (def.parts || []).map(toCompact);
+  const style = modelStyle === 'realistic' ? STYLE_REAL : STYLE_BLOCKY;
+  const prompt = `${SPEC}${style}${images.length ? `\n\n${images.length} reference image${images.length > 1 ? 's are' : ' is'} attached: match its details.` : ''}
+
+CURRENT MODEL: kind "${def.kind}", name "${def.name}"${isChar ? `, body ${JSON.stringify(def.body || {}, round3)}` : ''}.
+Its parts, in the compact format (a part's index is its position in this list, starting at 0):
+${JSON.stringify(list, round3)}
+
+TASK: ADD DETAIL. Focus on ${focus || (isChar ? DETAIL_FOCUS_CHAR : DETAIL_FOCUS_PROP)}.
+Return ONLY {"add":[...],"transparent":[...],"remove":[...]}:
+- "add": 40-200 NEW parts in the same coordinate frame${isChar ? ' (every part needs its "bone" in extras)' : ''}. Don't repeat existing parts.
+- Insides: if the object is enclosed (vehicle, building, room, aircraft, boat, cabinet, case...), model what's inside and visible through windows and openings. A car needs front and rear seats (cushion + backrest + headrest each), steering wheel and column, dashboard with instruments and vents, center console and gear lever, pedals, door panels with handles and armrests, rear-view mirror, seat belts, floor.
+- "remove": indexes of solid parts that fill a space that should be hollow (e.g. one big block used as the whole body or cabin). Add thinner panels (floor, sides, roof, pillars, firewall) that keep the same outer shape with the inside empty.
+- "transparent": indexes of window or glass parts that are opaque now; they become see-through glass.
+- Outside, add the small things an artist draws: seams and panel lines, handles, hinges, trims, vents, grilles, light lenses, badges, bolts, rims and treads, wipers, mirrors, stitching, laces, buttons, pockets.`;
+  const text = await aiCall(prompt, { signal, quality, images, nocache: true, onText });
+  const j = parseModel(text);
+  const n = (def.parts || []).length;
+  let rm = new Set((j.remove || []).map(Number).filter(i => i >= 0 && i < n));
+  const tr = new Set((j.transparent || []).map(Number).filter(i => i >= 0 && i < n));
+  const addRaw = Array.isArray(j.add) ? j.add : Array.isArray(j.parts) ? j.parts : [];
+  if (rm.size > n * 0.5 && addRaw.length < rm.size * 2) rm = new Set(); // don't let a weak reply gut the model
+  let added = [];
+  if (addRaw.length) added = normalize({ kind: def.kind, name: def.name, body: def.body, pose: def.pose, parts: addRaw }, def.kind).parts;
+  if (!added.length && !tr.size) throw new Error('no detail added');
+  const kept = (def.parts || []).map((p, i) => tr.has(i) ? { ...p, opacity: 0.3 } : p).filter((p, i) => !rm.has(i));
+  return { ...def, parts: kept.concat(added).slice(0, 900), _added: added.length };
 }
 async function generate(q, kindPref, base = null, x = {}) {
   if (!aiReady()) {
@@ -1359,14 +1432,25 @@ async function generate(q, kindPref, base = null, x = {}) {
   try {
     const opts = {
       signal: busy.signal, quality, images, nocache: !!base,
-      onText: ({ text }) => { const n = (text.match(/"shape"/g) || []).length; setStatus(x.poseOnly ? 'Posing…' : n ? `Placing parts… ${n}` : 'Thinking about shapes…', 'busy'); }
+      onText: ({ text }) => { const n = countParts(text); setStatus(x.poseOnly ? 'Posing…' : n ? `${x.detailOnly ? 'Adding detail' : 'Placing parts'}… ${n}` : 'Thinking about shapes…', 'busy'); }
     };
     if (aiCfg.provider !== 'claude') setStatus('Waiting for ' + PROVIDERS[aiCfg.provider].split(':')[0] + '… (local models can take a few minutes)', 'busy');
+    if (x.detailOnly) {
+      setStatus('Adding interior and detail' + (q ? ` (${q})` : '') + '…', 'busy');
+      const d = await detailPass(base, q, opts);
+      setStatus(`Added ${d._added} detail parts to “${d.name}” in ${((performance.now() - t0) / 1000).toFixed(0)}s.`);
+      delete d._added; return d;
+    }
     const prompt = buildPrompt(q, kindPref, base, { nImg: images.length, notes, copyPose: $('#copyPose').checked, poseOnly: x.poseOnly });
     const res = { text: await aiCall(prompt, opts) };
     if (x.poseOnly) { const j = parseModel(res.text); const pose = normPose(j.pose || j); if (!Object.keys(pose).length) throw new Error('no pose'); return { pose }; }
-    const def = normalize(parseModel(res.text), kindPref);
-    setStatus(`Built “${def.name}” from ${def.parts.length} parts in ${((performance.now() - t0) / 1000).toFixed(0)}s.`);
+    let def = normalize(parseModel(res.text), kindPref), note = '';
+    if (!base && wantDetailPass()) {
+      setStatus(`Built the shape (${def.parts.length} parts). Now adding the interior and fine detail…`, 'busy');
+      try { const d = await detailPass(def, '', { ...opts, onText: ({ text }) => { const n = countParts(text); setStatus(`Adding interior and detail… ${n || ''}`, 'busy'); } }); delete d._added; def = d; }
+      catch (e) { if (e && (e.code === 'cancelled' || e.name === 'AbortError')) throw e; console.warn('[detail pass]', e); note = ' The extra detail pass didn’t finish; use ✨ Add more detail to try again.'; }
+    }
+    setStatus(`Built “${def.name}” from ${def.parts.length} parts in ${((performance.now() - t0) / 1000).toFixed(0)}s.${note}`);
     return def;
   } catch (e) {
     lastErr = (e && (e.code || e.message)) || 'error';
@@ -1458,6 +1542,8 @@ function setModelStyle(v, quiet) {
   markHighlight(); renderInspector();
   setStatus(modelStyle === 'realistic' ? 'Realistic style: smooth, sculpted figures and rounded props. New AI builds get more lifelike detail.' : 'Blocky style: simple mannequins and blockout shapes.');
 }
+try { $('#detailPass').checked = localStorage.getItem('pp3d.detail') !== 'false'; } catch { $('#detailPass').checked = true; }
+$('#detailPass').addEventListener('change', e => { try { localStorage.setItem('pp3d.detail', String(e.target.checked)); } catch { } });
 $('#styleSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setModelStyle(b.dataset.v); });
 setModelStyle(modelStyle, true);
 segBind('#guideSeg', v => guides = v);
