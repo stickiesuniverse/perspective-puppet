@@ -280,6 +280,7 @@ body.mobile.dragging #stage::after{font-size:16px}
       </form>
       <div class="row" style="margin-top:9px">
         <div class="seg" id="kindSeg"><button data-v="auto" class="on">Auto</button><button data-v="character">Character</button><button data-v="prop">Prop</button></div>
+        <div class="seg" id="styleSeg" title="How characters and props look. Realistic is easier to draw from; Blocky is quick and simple."><button data-v="blocky" type="button">Blocky</button><button data-v="realistic" type="button">Realistic</button></div>
         <div class="seg" id="qualSeg" title="Detailed takes longer but gives better shapes"><button data-v="default" class="on">Fast</button><button data-v="complex">Detailed</button></div>
       </div>
       <details id="aiBox" class="aibox">
@@ -426,6 +427,9 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { OutlineEffect } from 'three/addons/effects/OutlineEffect.js';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+// "blocky" (default) or "realistic": how characters and props are drawn, and what the AI is asked for
+let modelStyle = (() => { try { return JSON.parse(localStorage.getItem('pp3d.style') || '"blocky"') === 'realistic' ? 'realistic' : 'blocky'; } catch { return 'blocky'; } })();
 
 const $ = s => document.querySelector(s);
 const D2R = Math.PI / 180, V = THREE.Vector3;
@@ -501,6 +505,9 @@ function makePart(p, extra = {}) {
     g = cachedGeo('pyr', () => { const q = new THREE.ConeGeometry(0.5 * Math.SQRT2, 1, 4); q.rotateY(Math.PI / 4); return q; });
   } else if (shape === 'wedge' || shape === 'ramp') {
     g = cachedGeo('wedge', wedgeGeo);
+  } else if (modelStyle === 'realistic' && !extra.body) {
+    const q = s.map(v => +v.toFixed(3)), r = Math.min(Math.min(...q) * 0.22, 0.05);
+    g = cachedGeo('rb' + q.join('_'), () => new RoundedBoxGeometry(q[0], q[1], q[2], 3, r)); sc = [1, 1, 1];
   } else {
     g = cachedGeo('box', () => new THREE.BoxGeometry(1, 1, 1));
   }
@@ -600,25 +607,76 @@ function buildCharacter(def) {
     const s = new THREE.Group(); s.scale.set(...scl); s.userData.bone = name; g.add(s); skins[name] = s; return s;
   };
   const P = (s, spec, joint = false) => { const m = makePart({ ...spec, color: joint ? jc : skin }, { body: true, joint }); s.add(m); return m; };
+  // ---- body meshes: blocky mannequin or realistic sculpted figure (same bones either way) ----
+  const R = modelStyle === 'realistic';
+  const M = (s, geo, { pos = [0, 0, 0], rot = [0, 0, 0], scl = [1, 1, 1], joint = false } = {}) => {
+    const m = new THREE.Mesh(geo, PLACE); m.position.set(...pos); m.rotation.set(rot[0] * D2R, rot[1] * D2R, rot[2] * D2R); m.scale.set(...scl);
+    m.castShadow = m.receiveShadow = true; m.userData = { styleable: true, color: joint ? jc : skin, metal: false, opacity: 1, body: true, joint }; s.add(m); return m;
+  };
+  const SPH = cachedGeo('rsph', () => new THREE.SphereGeometry(0.5, 36, 26));
+  const ball = (s, size, pos, o = {}) => M(s, SPH, { pos, scl: size, ...o });
+  const lathe = (key, pts) => cachedGeo('lathe_' + key, () => new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), 32));
+  const caps = (s, d, len, pos, rot = [0, 0, 0], o = {}) => M(s, cachedGeo(`rcap${d}_${len}`, () => new THREE.CapsuleGeometry(d / 2, Math.max(len - d, 0.001), 6, 16)), { pos, rot, ...o });
+  const rbox = (s, size, pos, rot = [0, 0, 0]) => M(s, cachedGeo('rbox' + size.join('_'), () => new RoundedBoxGeometry(size[0], size[1], size[2], 4, Math.min(...size) * 0.42)), { pos, rot });
+  const realHead = s => {
+    ball(s, [0.185, 0.205, 0.215], [0, 0.02, -0.01]);             // cranium
+    ball(s, [0.145, 0.16, 0.16], [0, -0.035, 0.025]);             // face + jaw
+    ball(s, [0.062, 0.05, 0.05], [0, -0.094, 0.064]);             // chin
+    for (const sd of [1, -1]) {
+      ball(s, [0.05, 0.04, 0.042], [sd * 0.05, -0.012, 0.074]);   // cheekbones
+      ball(s, [0.03, 0.016, 0.016], [sd * 0.033, 0.006, 0.097], { joint: true }); // eyes
+      ball(s, [0.02, 0.056, 0.036], [sd * 0.094, -0.004, -0.006]); // ears
+    }
+    caps(s, 0.024, 0.13, [0, 0.026, 0.094], [0, 0, 90]);          // brow ridge
+    ball(s, [0.024, 0.05, 0.034], [0, -0.016, 0.107]);            // nose bridge
+    ball(s, [0.031, 0.024, 0.026], [0, -0.04, 0.114]);            // nose tip
+    caps(s, 0.015, 0.046, [0, -0.063, 0.098], [0, 0, 90], { joint: true }); // mouth line
+  };
+  const realHand = (s, sd) => {
+    rbox(s, [0.03, 0.088, 0.08], [0, -0.05, 0.004]);              // palm
+    const fz = [0.028, 0.009, -0.01, -0.028], l1 = [0.044, 0.048, 0.046, 0.037], l2 = [0.034, 0.038, 0.036, 0.028];
+    for (let i = 0; i < 4; i++) {
+      caps(s, 0.018, l1[i], [-sd * 0.002, -0.094 - l1[i] / 2, fz[i]], [0, 0, sd * 6]);
+      caps(s, 0.016, l2[i], [-sd * 0.008, -0.094 - l1[i] - l2[i] / 2 + 0.004, fz[i]], [0, 0, sd * 16]);
+    }
+    caps(s, 0.02, 0.05, [-sd * 0.014, -0.045, 0.043], [-32, 0, sd * 18]); // thumb
+    caps(s, 0.017, 0.032, [-sd * 0.02, -0.075, 0.056], [-48, 0, sd * 22]);
+  };
   let s;
   s = bone('hips', null, 0, 0.972 * k, 0, [k * b.hips * wm, k, k * W]);
-  P(s, { shape: 'sphere', size: [0.33, 0.21, 0.2], pos: [0, -0.01, 0] });
+  if (R) { ball(s, [0.32, 0.2, 0.21], [0, -0.005, 0]); for (const sd of [1, -1]) ball(s, [0.15, 0.17, 0.15], [sd * 0.06, -0.04, -0.05]); }
+  else P(s, { shape: 'sphere', size: [0.33, 0.21, 0.2], pos: [0, -0.01, 0] });
   s = bone('spine', 'hips', 0, 0.084 * k, 0, [k * wm, k, k * W]);
-  P(s, { shape: 'cylinder', size: [0.25, 0.2, 0.165], taper: 1.06, pos: [0, 0.05, 0] });
+  if (R) { M(s, lathe('abd', [[0, -0.05], [0.125, -0.03], [0.118, 0.04], [0.121, 0.1], [0.135, 0.17], [0, 0.185]]), { scl: [1, 1, 0.68] }); ball(s, [0.17, 0.18, 0.06], [0, 0.06, 0.066]); }
+  else P(s, { shape: 'cylinder', size: [0.25, 0.2, 0.165], taper: 1.06, pos: [0, 0.05, 0] });
   s = bone('chest', 'spine', 0, 0.168 * k, 0, [k * b.shoulders * wm, k, k * W]);
-  P(s, { shape: 'sphere', size: [0.31, 0.29, 0.21], pos: [0, 0.108, 0] });
-  P(s, { shape: 'capsule', size: [0.085, 0.37, 0.085], rot: [0, 0, 90], pos: [0, 0.19, -0.012] });
+  if (R) {
+    ball(s, [0.3, 0.3, 0.21], [0, 0.1, 0]);                         // ribcage
+    ball(s, [0.31, 0.09, 0.15], [0, 0.205, -0.016]);                // shoulders / trapezius
+    for (const sd of [1, -1]) {
+      ball(s, [0.1, 0.13, 0.045], [sd * 0.066, 0.13, -0.088]);      // shoulder blades
+      if (b.bust < 0.3) ball(s, [0.13, 0.095, 0.06], [sd * 0.06, 0.14, 0.084], { rot: [0, 0, sd * -8] }); // pecs
+    }
+  } else {
+    P(s, { shape: 'sphere', size: [0.31, 0.29, 0.21], pos: [0, 0.108, 0] });
+    P(s, { shape: 'capsule', size: [0.085, 0.37, 0.085], rot: [0, 0, 90], pos: [0, 0.19, -0.012] });
+  }
   if (b.bust > 0.04) for (const sd of [1, -1]) { const f = 0.55 + 0.6 * b.bust;
-    P(s, { shape: 'sphere', size: [0.115 * f, 0.105 * f, 0.1 * f], pos: [sd * 0.058, 0.07, 0.07 + 0.025 * f] }); }
+    if (R) ball(s, [0.12 * f, 0.11 * f, 0.105 * f], [sd * 0.058, 0.075, 0.068 + 0.026 * f]);
+    else P(s, { shape: 'sphere', size: [0.115 * f, 0.105 * f, 0.1 * f], pos: [sd * 0.058, 0.07, 0.07 + 0.025 * f] }); }
   const nw = 0.7 + 0.3 * W;
   s = bone('neck', 'chest', 0, 0.24 * k, 0, [k * nw, k, k * nw]);
-  P(s, { shape: 'cylinder', size: [0.095, 0.15, 0.1], taper: 0.92, pos: [0, 0.035, 0.004] });
+  if (R) M(s, lathe('neck', [[0, -0.03], [0.058, -0.025], [0.049, 0.04], [0.05, 0.1], [0, 0.115]]), { pos: [0, 0, 0.004], scl: [1, 1, 0.95] });
+  else P(s, { shape: 'cylinder', size: [0.095, 0.15, 0.1], taper: 0.92, pos: [0, 0.035, 0.004] });
   s = bone('head', 'neck', 0, 0.084 * k, 0, [hs, hs, hs]);
   s.position.y = 0.12 * hs;
-  P(s, { shape: 'sphere', size: [0.19, 0.215, 0.22], pos: [0, 0.014, -0.006] });
-  P(s, { shape: 'sphere', size: [0.135, 0.13, 0.15], pos: [0, -0.052, 0.03] });
-  P(s, { shape: 'cone', size: [0.032, 0.05, 0.034], rot: [90, 0, 0], pos: [0, -0.012, 0.112] }, true);
-  for (const sd of [1, -1]) P(s, { shape: 'sphere', size: [0.022, 0.055, 0.035], pos: [sd * 0.094, -0.005, -0.004] }, true);
+  if (R) realHead(s);
+  else {
+    P(s, { shape: 'sphere', size: [0.19, 0.215, 0.22], pos: [0, 0.014, -0.006] });
+    P(s, { shape: 'sphere', size: [0.135, 0.13, 0.15], pos: [0, -0.052, 0.03] });
+    P(s, { shape: 'cone', size: [0.032, 0.05, 0.034], rot: [90, 0, 0], pos: [0, -0.012, 0.112] }, true);
+    for (const sd of [1, -1]) P(s, { shape: 'sphere', size: [0.022, 0.055, 0.035], pos: [sd * 0.094, -0.005, -0.004] }, true);
+  }
   const hg = new THREE.Group(); hg.userData.headLines = true;
   hg.add(ellipse(0.0985, 0.115, 'xz', [0, 0, -0.004]));
   hg.add(ellipse(0.128, 0.116, 'yz', [0, -0.008, 0]));
@@ -627,28 +685,49 @@ function buildCharacter(def) {
   for (const sd of [1, -1]) {
     const x = sd > 0 ? '_l' : '_r';
     s = bone('upperarm' + x, 'chest', sd * 0.165 * k * b.shoulders * wm, 0.2 * k, -0.006 * k, [k * W, k, k * W]);
-    P(s, { shape: 'sphere', size: [0.105, 0.105, 0.105] }, true);
-    P(s, { shape: 'cylinder', size: [0.072, 0.31, 0.077], taper: 1.33, pos: [0, -0.17, 0] });
+    if (R) {
+      ball(s, [0.112, 0.135, 0.112], [sd * 0.012, -0.03, 0]);       // deltoid
+      M(s, lathe('uarm', [[0, 0.01], [0.045, -0.02], [0.048, -0.08], [0.05, -0.14], [0.043, -0.24], [0.036, -0.33], [0, -0.345]]), { scl: [1, 1, 1.05] });
+      ball(s, [0.07, 0.12, 0.075], [0, -0.15, 0.012]);              // biceps
+    } else {
+      P(s, { shape: 'sphere', size: [0.105, 0.105, 0.105] }, true);
+      P(s, { shape: 'cylinder', size: [0.072, 0.31, 0.077], taper: 1.33, pos: [0, -0.17, 0] });
+    }
     s = bone('forearm' + x, 'upperarm' + x, 0, -0.336 * k, 0, [k * W, k, k * W]);
-    P(s, { shape: 'sphere', size: [0.074, 0.074, 0.074] }, true);
-    P(s, { shape: 'cylinder', size: [0.05, 0.26, 0.058], taper: 1.42, pos: [0, -0.137, 0] });
+    if (R) { ball(s, [0.07, 0.07, 0.07], [0, 0, -0.004]); M(s, lathe('farm', [[0, 0.012], [0.036, 0], [0.043, -0.06], [0.036, -0.15], [0.027, -0.25], [0.024, -0.276], [0, -0.282]]), { scl: [0.88, 1, 1.05] }); }
+    else {
+      P(s, { shape: 'sphere', size: [0.074, 0.074, 0.074] }, true);
+      P(s, { shape: 'cylinder', size: [0.05, 0.26, 0.058], taper: 1.42, pos: [0, -0.137, 0] });
+    }
     const hw = 0.75 + 0.25 * W;
     s = bone('hand' + x, 'forearm' + x, 0, -0.276 * k, 0, [k * hw, k, k * hw]);
-    P(s, { shape: 'sphere', size: [0.052, 0.052, 0.052] }, true);
-    P(s, { shape: 'box', size: [0.032, 0.095, 0.082], pos: [0, -0.055, 0.003] });
-    P(s, { shape: 'box', size: [0.026, 0.075, 0.078], pos: [sd * 0.003, -0.14, 0.004], rot: [6, 0, 0] });
-    P(s, { shape: 'box', size: [0.022, 0.06, 0.022], pos: [-sd * 0.016, -0.045, 0.046], rot: [-25, 0, 0] });
+    if (R) realHand(s, sd);
+    else {
+      P(s, { shape: 'sphere', size: [0.052, 0.052, 0.052] }, true);
+      P(s, { shape: 'box', size: [0.032, 0.095, 0.082], pos: [0, -0.055, 0.003] });
+      P(s, { shape: 'box', size: [0.026, 0.075, 0.078], pos: [sd * 0.003, -0.14, 0.004], rot: [6, 0, 0] });
+      P(s, { shape: 'box', size: [0.022, 0.06, 0.022], pos: [-sd * 0.016, -0.045, 0.046], rot: [-25, 0, 0] });
+    }
     s = bone('thigh' + x, 'hips', sd * 0.096 * k * b.hips * wm, -0.036 * k, 0, [k * W, k, k * W]);
-    P(s, { shape: 'sphere', size: [0.135, 0.135, 0.135] }, true);
-    P(s, { shape: 'cylinder', size: [0.104, 0.43, 0.115], taper: 1.45, pos: [0, -0.222, 0.005] });
+    if (R) { M(s, lathe('thigh', [[0, 0.03], [0.075, 0], [0.08, -0.06], [0.075, -0.15], [0.065, -0.28], [0.05, -0.4], [0.045, -0.444], [0, -0.452]]), { pos: [0, 0, 0.005], scl: [0.95, 1, 1.05] }); ball(s, [0.1, 0.22, 0.08], [sd * 0.005, -0.2, 0.035]); }
+    else {
+      P(s, { shape: 'sphere', size: [0.135, 0.135, 0.135] }, true);
+      P(s, { shape: 'cylinder', size: [0.104, 0.43, 0.115], taper: 1.45, pos: [0, -0.222, 0.005] });
+    }
     s = bone('shin' + x, 'thigh' + x, 0, -0.444 * k, 0, [k * W, k, k * W]);
-    P(s, { shape: 'sphere', size: [0.098, 0.098, 0.098] }, true);
-    P(s, { shape: 'cylinder', size: [0.068, 0.41, 0.078], taper: 1.5, pos: [0, -0.21, -0.006] });
+    if (R) { ball(s, [0.05, 0.056, 0.04], [0, 0.005, 0.04]); M(s, lathe('shin', [[0, 0.025], [0.046, 0], [0.05, -0.08], [0.044, -0.18], [0.032, -0.32], [0.026, -0.4], [0.027, -0.42], [0, -0.426]]), { scl: [1, 1, 1.05] }); ball(s, [0.075, 0.17, 0.08], [0, -0.11, -0.025]); }
+    else {
+      P(s, { shape: 'sphere', size: [0.098, 0.098, 0.098] }, true);
+      P(s, { shape: 'cylinder', size: [0.068, 0.41, 0.078], taper: 1.5, pos: [0, -0.21, -0.006] });
+    }
     const fw = 0.8 + 0.2 * W;
     s = bone('foot' + x, 'shin' + x, 0, -0.42 * k, 0, [k * fw, k, k]);
-    P(s, { shape: 'sphere', size: [0.066, 0.066, 0.066] }, true);
-    P(s, { shape: 'box', size: [0.085, 0.06, 0.19], pos: [0, -0.04, 0.05] });
-    P(s, { shape: 'box', size: [0.08, 0.035, 0.05], pos: [0, -0.0525, 0.165] });
+    if (R) { ball(s, [0.056, 0.06, 0.06], [0, -0.01, 0]); ball(s, [0.085, 0.06, 0.23], [0, -0.042, 0.06]); ball(s, [0.062, 0.056, 0.07], [0, -0.044, -0.025]); ball(s, [0.082, 0.036, 0.06], [0, -0.054, 0.158]); }
+    else {
+      P(s, { shape: 'sphere', size: [0.066, 0.066, 0.066] }, true);
+      P(s, { shape: 'box', size: [0.085, 0.06, 0.19], pos: [0, -0.04, 0.05] });
+      P(s, { shape: 'box', size: [0.08, 0.035, 0.05], pos: [0, -0.0525, 0.165] });
+    }
   }
   for (const p of (def.parts || [])) {
     const bn = BONES.includes(p.bone) ? p.bone : null;
@@ -1220,8 +1299,10 @@ function refBlock(nImg, notes, copyPose, mode) {
   for (const n of notes) s += `\n\nNOTES FROM THE FILE "${n.name}":\n${n.text}`;
   return s;
 }
+const STYLE_BLOCKY = `\n\nSTYLE: BLOCKY. A clean, simple blockout that reads well at a glance: favor boxes and simple shapes, 10-60 parts.`;
+const STYLE_REAL = `\n\nSTYLE: REALISTIC. The user wants a lifelike, organic model that is easy to draw from, not a blocky blockout. Sculpt curves by layering several overlapping rounded primitives (spheres, capsules, tapered cylinders, tori, hemispheres); boxes get rounded edges automatically, so use them only where the real object is boxy. Get true proportions and silhouettes, include the small features an artist would draw (handles, seams, trims, buttons, laces, panel lines, rims), and use natural, realistic colors. Use 40-150 parts. For CHARACTERS the app supplies a realistic sculpted body: clothing should hug it closely (just slightly larger than the body part it covers) with collars, cuffs, hems and a few folds; build hair from several overlapping masses that follow the head shape; shoes should be shaped, not boxes.`;
 function buildPrompt(q, kind, base, x = {}) {
-  const rb = refBlock(x.nImg || 0, x.notes || [], x.copyPose, x.poseOnly ? 'pose' : 'build');
+  const rb = (x.poseOnly ? '' : (modelStyle === 'realistic' ? STYLE_REAL : STYLE_BLOCKY)) + refBlock(x.nImg || 0, x.notes || [], x.copyPose, x.poseOnly ? 'pose' : 'build');
   if (x.poseOnly) return `${SPEC}${rb}\n\nTASK: This is an existing CHARACTER (JSON below). Look at the human figure in the reference image and work out its pose, joint by joint, in this app's pose convention (hips/whole-body lean, spine, chest, neck, head, both shoulders, elbows, wrists, hips, knees, ankles, plus "lift" if they are airborne). ${SIDES} Body: ${JSON.stringify(base.body || {}, round3)}\nReturn ONLY {"pose":{...}}.`;
   if (base) return `${SPEC}${rb}\n\nCURRENT MODEL (JSON):\n${JSON.stringify(base, round3)}\n\nCHANGE REQUESTED: "${q}"${x.nImg ? ' Use the reference image(s) as visual guidance for the change.' : ''}\nReturn the COMPLETE updated model as JSON in the same format, keeping everything the change doesn't touch. JSON only.`;
   return `${SPEC}${rb}\n\nREQUEST: ${q ? `"${q}"` : '(no text: build what the reference shows)'}\n${kind !== 'auto' ? `Build it as a ${kind.toUpperCase()}.` : 'Decide whether it is a CHARACTER (humanoid) or a PROP.'}\nReturn the JSON only.`;
@@ -1376,6 +1457,17 @@ $('#chips').innerHTML = SUGGEST.map(s => `<button class="chip" type="button">${s
 $('#chips').addEventListener('click', e => { const c = e.target.closest('.chip'); if (c) { $('#q').value = c.textContent; runSearch(); } });
 function segBind(id, cb) { $(id).addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; $(id).querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); cb && cb(b.dataset.v); }); }
 segBind('#kindSeg'); segBind('#qualSeg');
+function setModelStyle(v, quiet) {
+  modelStyle = v === 'realistic' ? 'realistic' : 'blocky';
+  try { localStorage.setItem('pp3d.style', JSON.stringify(modelStyle)); } catch { }
+  document.querySelectorAll('#styleSeg button').forEach(b => b.classList.toggle('on', b.dataset.v === modelStyle));
+  if (quiet) return;
+  for (const o of objects) if (o.def.kind !== 'mesh') rebuild(o);
+  markHighlight(); renderInspector();
+  setStatus(modelStyle === 'realistic' ? 'Realistic style: smooth, sculpted figures and rounded props. New AI builds get more lifelike detail.' : 'Blocky style: simple mannequins and blockout shapes.');
+}
+$('#styleSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setModelStyle(b.dataset.v); });
+setModelStyle(modelStyle, true);
 segBind('#guideSeg', v => guides = v);
 segBind('#modeSeg', v => setMode(v));
 $('#searchForm').addEventListener('submit', e => { e.preventDefault(); runSearch(); });
