@@ -1834,7 +1834,7 @@ async function libDel(id) {
   if (Lib.mode === 'db') { await Lib.col().doc('it_' + id).delete(); for (let i = 0; i < ((m && m.chunks) || 0); i++) await Lib.col().doc(`ch_${id}_${i}`).delete().catch(() => { }); }
   else if (Lib.mode === 'idb') await idbDo('readwrite', st => st.delete(id)); else Lib.mem.delete(id);
   Lib.items = Lib.items.filter(x => x.id !== id);
-  if (Lib.sceneId === id) Lib.sceneId = null;
+  if (Lib.sceneId === id) { Lib.sceneId = null; Lib.sceneDetached = true; ST.set('pp3d.sceneDetached', true); ST.set('pp3d.sceneId', { id: null, name: Lib.sceneName }); if (!Sync.applying) setTimeout(() => setStatus('Scene deleted. It\u2019s still open on screen but no longer saved; it won\u2019t come back unless you save it again.'), 0); }
   objects.forEach(o => { if (o.libId === id) o.libId = null; }); refs.forEach(r => { if (r.libId === id) r.libId = null; });
   renderLibrary(); renderLibBadge();
 }
@@ -1916,6 +1916,7 @@ async function saveScene(asNew = false, name = '', quiet = false) {
     };
     const nm = name || Lib.sceneName || ('Scene ' + new Date().toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }));
     const id = await libPut({ id: asNew ? null : (Lib.items.some(x => x.id === Lib.sceneId) ? Lib.sceneId : null), type: 'scene', name: nm, thumb: makeThumb(null), data, big: Object.keys(meshes).length ? JSON.stringify(meshes) : '' });
+    Lib.sceneDetached = false; ST.set('pp3d.sceneDetached', false);
     Lib.sceneId = id; Lib.sceneName = nm; Lib.sceneSig = sceneSig(); ST.set('pp3d.sceneId', { id, name: nm }); ST.set('pp3d.sceneSig', Lib.sceneSig);
     updateSceneTitle(); renderHome();
     if (!quiet) setStatus(`Saved scene “${nm}” (${objects.length} object${objects.length === 1 ? '' : 's'}).`); renderLibBadge(); return true;
@@ -1976,6 +1977,7 @@ async function loadScene(it) {
   }
   const c = it.data && it.data.camera;
   if (c) { tween = null; camera.position.fromArray(c.p); controls.target.fromArray(c.t); setFocal(c.f || 35, false); $('#roll').value = c.roll || 0; $('#roll').dispatchEvent(new Event('input')); }
+  Lib.sceneDetached = false; ST.set('pp3d.sceneDetached', false);
   Lib.sceneId = it.id; Lib.sceneName = it.name; Lib.sceneSig = sceneSig(); ST.set('pp3d.sceneId', { id: it.id, name: it.name }); ST.set('pp3d.sceneSig', Lib.sceneSig);
   renderList(); renderInspector(); save(); renderLibBadge();
   setStatus(`Opened scene “${it.name}”.`); updateSceneTitle();
@@ -2134,7 +2136,7 @@ function newScene(tid, name) {
   const t = TEMPLATES.find(x => x.id === tid) || TEMPLATES[0];
   clearScene();
   for (const [def, tr] of t.build()) addObject(def, { t: tr, silent: true });
-  Lib.sceneId = null; Lib.sceneName = name || t.name + ' scene'; Lib.sceneSig = null;
+  Lib.sceneId = null; Lib.sceneName = name || t.name + ' scene'; Lib.sceneSig = null; Lib.sceneDetached = false; ST.set('pp3d.sceneDetached', false);
   ST.set('pp3d.sceneId', { id: null, name: Lib.sceneName }); ST.set('pp3d.sceneSig', null);
   renderList(); renderInspector(); save(); updateSceneTitle();
   closeHome(); setTimeout(() => viewPreset(tid === 'street' ? 'eye' : 'threeq'), 40);
@@ -2294,7 +2296,8 @@ async function syncNow(reason) {
   Sync.running = true; setSyncState('syncing');
   let pulled = 0, pushed = 0, removed = 0;
   try {
-    if (Sync.cfg.scene && objects.length && sceneIsDirty()) await saveScene(false, '', true);
+    // only keeps a scene you've saved yourself up to date; never creates new Library items on its own
+    if (Sync.cfg.scene && objects.length && !Lib.sceneDetached && Lib.sceneId && Lib.items.some(x => x.id === Lib.sceneId) && sceneIsDirty()) await saveScene(false, '', true);
     // 1. the shared index
     let idx = { v: 1, items: {}, deleted: {} }, idxSha = null;
     const r = await gh('index.json');
@@ -2390,7 +2393,7 @@ function syncTabHTML() {
       </ol>
       <label class="fld2">Repository<input id="syncRepo" value="${esc(c.repo)}" autocomplete="off" spellcheck="false" placeholder="yourname/perspective-puppet-data"></label>
       <label class="fld2">Token<input id="syncToken" type="password" value="${esc(c.token)}" autocomplete="off" spellcheck="false" placeholder="github_pat_…"></label>
-      <label class="check" style="margin-top:8px"><input type="checkbox" id="syncScene" ${c.scene ? 'checked' : ''}> Keep the scene I’m working on synced too (saves it to the Library automatically)</label>
+      <label class="check" style="margin-top:8px"><input type="checkbox" id="syncScene" ${c.scene ? 'checked' : ''}> Keep the open scene up to date once I’ve saved it (later changes sync without pressing Save)</label>
       <div class="row" style="margin-top:10px"><button class="btn primary" data-act="sync-connect">${connected ? 'Save &amp; sync' : 'Connect'}</button>${c.on ? '<button class="btn danger" data-act="sync-off">Turn off on this device</button>' : ''}</div>
       <p class="hint">The token is stored only on this device and is only sent to GitHub. Anyone with the token can read and change your synced library, so keep it private.</p>
     </details></div>`;
@@ -2617,7 +2620,7 @@ addEventListener('keydown', e => {
 /* ================= boot ================= */
 const saved = LS.get('pp3d.scene', null);
 const hadSavedScene = !!(saved && saved.length);
-{ const s0 = ST.get('pp3d.sceneId', null); if (s0) { Lib.sceneId = s0.id; Lib.sceneName = s0.name; } }
+{ const s0 = ST.get('pp3d.sceneId', null); if (s0) { Lib.sceneId = s0.id; Lib.sceneName = s0.name; } Lib.sceneDetached = !!ST.get('pp3d.sceneDetached', false); }
 if (saved && saved.length) {
   for (const s of saved) { try { const o = addObject({ ...s.def, pose: s.pose, name: s.name }, { t: s.t, silent: true }); o.root.visible = s.vis !== false; o.libId = s.libId || null; o.savedSig = s.sig || null; } catch { } }
   renderList();
