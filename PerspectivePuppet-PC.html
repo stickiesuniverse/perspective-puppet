@@ -151,6 +151,9 @@ textarea:focus{border-color:var(--accent)}
 .lk{display:flex;align-items:center;gap:6px;font-size:12.5px;color:#bdb9b1;min-width:150px}
 .lk select{flex:1;min-width:90px}
 .lkrow input[type=color]{width:34px;height:26px;border:1px solid var(--line);border-radius:6px;background:none;padding:1px}
+.zoombtns{background:rgba(22,25,31,.88)}
+.zoombtns button{font-size:16px;padding:3px 11px;color:var(--text)}
+body.mobile .zoombtns button{padding:7px 14px;font-size:18px}
 .syncbox{max-width:680px}
 .syncchip{font-size:12px!important}
 .syncchip.bad{border-color:var(--red);color:var(--red)}
@@ -374,6 +377,7 @@ body.mobile.dragging #stage::after{font-size:16px}
       <div class="seg" id="modeSeg"><button data-v="pose" class="on" title="Q">Pose</button><button data-v="translate" title="W">Move</button><button data-v="rotate" title="E">Rotate</button><button data-v="scale" title="R">Scale</button></div>
       <span class="hud" id="hud"></span>
       <span class="grow"></span>
+      <span class="seg zoombtns"><button type="button" id="zoomIn" title="Zoom in (+ key). Scroll or pinch to zoom toward a spot; double-click to fly in on it.">＋</button><button type="button" id="zoomOut" title="Zoom out (− key)">－</button></span>
       <button class="btn" id="snapBtn">📷 Snapshot PNG</button>
       <button class="btn" id="glbBtn">⬇ Export .glb</button>
     </div>
@@ -443,12 +447,16 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 const outline = new OutlineEffect(renderer, { defaultThickness: 0.0055, defaultColor: [0.03, 0.03, 0.04] });
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#e9e6df');
-const camera = new THREE.PerspectiveCamera(50, 1, 0.02, 800);
+const camera = new THREE.PerspectiveCamera(50, 1, 0.01, 5000);
 camera.filmGauge = 35; camera.setFocalLength(35);
 camera.position.set(2.4, 1.5, 3.4);
 const controls = new OrbitControls(camera, glc);
 controls.target.set(0, 0.9, 0); controls.enableDamping = true; controls.dampingFactor = 0.12;
-controls.maxPolarAngle = Math.PI * 0.985; controls.minDistance = 0.05; controls.maxDistance = 400;
+controls.maxPolarAngle = Math.PI * 0.985;
+// near-limitless zoom: from 50 km out to half a millimetre in, diving toward whatever the cursor points at
+const ZOOM_MIN = 0.0005, ZOOM_MAX = 50000;
+controls.minDistance = ZOOM_MIN; controls.maxDistance = ZOOM_MAX;
+controls.zoomToCursor = true; controls.zoomSpeed = 1.4;
 
 const hemi = new THREE.HemisphereLight(0xffffff, 0x8a8170, 0.95); scene.add(hemi);
 const key = new THREE.DirectionalLight(0xffffff, 2.3);
@@ -457,8 +465,10 @@ Object.assign(key.shadow.camera, { left: -9, right: 9, top: 9, bottom: -9, near:
 key.shadow.bias = -0.0004; key.shadow.normalBias = 0.02;
 scene.add(key, key.target);
 const noOutline = m => { m.userData.outlineParameters = { visible: false }; return m; };
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), noOutline(new THREE.ShadowMaterial({ opacity: 0.22 })));
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(40000, 40000), noOutline(new THREE.ShadowMaterial({ opacity: 0.22 })));
 ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+const gridFar = new THREE.GridHelper(4000, 80, 0x000000, 0x000000);   // 50 m squares, for orientation when zoomed far out
+gridFar.material.transparent = true; gridFar.material.opacity = 0.07; noOutline(gridFar.material); scene.add(gridFar);
 const grid = new THREE.GridHelper(60, 60, 0x000000, 0x000000);
 grid.material.transparent = true; grid.material.opacity = 0.13; noOutline(grid.material); scene.add(grid);
 const world = new THREE.Group(); scene.add(world);
@@ -1085,6 +1095,24 @@ tc.addEventListener('objectChange', () => {
 /* picking */
 const ray = new THREE.Raycaster(); let downAt = null;
 glc.addEventListener('pointerdown', e => { downAt = (tc.axis || tc.dragging) ? null : [e.clientX, e.clientY]; });
+glc.addEventListener('dblclick', e => {
+  const r = glc.getBoundingClientRect();
+  ray.setFromCamera(new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1), camera);
+  const hit = ray.intersectObjects(world.children, true).find(h => h.object.isMesh && h.object.userData.styleable && h.object.visible);
+  let pt = hit ? hit.point : null;
+  if (!pt) { const g = new V(); if (ray.ray.intersectPlane(new THREE.Plane(new V(0, 1, 0), 0), g)) pt = g; }
+  if (!pt) return;
+  const dir = camera.position.clone().sub(controls.target).normalize();
+  const dist = clamp(camera.position.distanceTo(pt) * 0.35, ZOOM_MIN * 4, ZOOM_MAX);
+  tweenTo(pt.clone().addScaledVector(dir, dist), pt.clone(), 450);
+});
+let lastTap = 0;                             // double-tap on touch screens does the same
+glc.addEventListener('pointerup', e => {
+  if (e.pointerType !== 'touch') return;
+  const now = performance.now();
+  if (now - lastTap < 300) glc.dispatchEvent(new MouseEvent('dblclick', { clientX: e.clientX, clientY: e.clientY }));
+  lastTap = now;
+});
 glc.addEventListener('pointerup', e => {
   if (!downAt || e.button !== 0) return;
   if (Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 5) return;
@@ -1809,6 +1837,8 @@ $('#styleSeg').addEventListener('click', e => { const b = e.target.closest('butt
 setModelStyle(modelStyle, true);
 segBind('#guideSeg', v => guides = v);
 segBind('#modeSeg', v => setMode(v));
+$('#zoomIn').addEventListener('click', () => zoomBy(0.6));
+$('#zoomOut').addEventListener('click', () => zoomBy(1 / 0.6));
 $('#searchForm').addEventListener('submit', e => { e.preventDefault(); runSearch(); });
 async function runSearch() {
   const q = $('#q').value.trim();
@@ -2984,10 +3014,16 @@ function drawOverlay(forSnap = false) {
 
 /* ================= HUD / loop ================= */
 let frameN = 0;
+function fmtLen(m) {
+  if (m < 0.01) return (m * 1000).toFixed(m < 0.001 ? 2 : 1) + ' mm';
+  if (m < 1) return (m * 100).toFixed(1) + ' cm';
+  if (m < 1000) return m.toFixed(m < 10 ? 2 : 1) + ' m';
+  return (m / 1000).toFixed(m < 10000 ? 2 : 1) + ' km';
+}
 function updateHud() {
   const d = new V(); camera.getWorldDirection(d);
   const pitch = Math.asin(clamp(d.y, -1, 1)) / D2R;
-  $('#hud').textContent = `${Math.round(camera.getFocalLength())}mm · camera ${camera.position.y.toFixed(2)} m high · tilt ${pitch > 0 ? '+' : ''}${pitch.toFixed(0)}° · ${camera.position.distanceTo(controls.target).toFixed(1)} m away`;
+  $('#hud').textContent = `${Math.round(camera.getFocalLength())}mm · camera ${camera.position.y.toFixed(2)} m high · tilt ${pitch > 0 ? '+' : ''}${pitch.toFixed(0)}° · ${fmtLen(camera.position.distanceTo(controls.target))} away`;
 }
 function resize() {
   const r = stage.getBoundingClientRect(); vw = Math.max(r.width, 1); vh = Math.max(r.height, 1); dpr = Math.min(devicePixelRatio, 2);
@@ -2999,9 +3035,21 @@ new ResizeObserver(resize).observe(stage); resize();
 function renderScene() {
   if (style === 'comic' || style === 'ink') outline.render(scene, camera); else renderer.render(scene, camera);
 }
+function fitClipPlanes() {
+  const dist = camera.position.distanceTo(controls.target);
+  const near = clamp(dist * 0.004, 0.00002, 0.5), far = clamp(dist * 400, 200, 2e6);
+  if (Math.abs(near - camera.near) > camera.near * 0.15 || Math.abs(far - camera.far) > camera.far * 0.15) {
+    camera.near = near; camera.far = far; camera.updateProjectionMatrix();
+  }
+}
+function zoomBy(f) {                       // f < 1 zooms in, > 1 out, around the orbit point
+  const off = camera.position.clone().sub(controls.target);
+  const len = clamp(off.length() * f, ZOOM_MIN, ZOOM_MAX);
+  tween = null; camera.position.copy(controls.target).add(off.setLength(len));
+}
 function loop() {
   requestAnimationFrame(loop);
-  stepTween(); controls.update();
+  stepTween(); controls.update(); fitClipPlanes();
   if (roll) camera.rotateZ(roll);
   renderScene(); drawOverlay();
   if (++frameN % 6 === 0) updateHud();
@@ -3052,6 +3100,8 @@ addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
   if (k === 'q') setMode('pose'); else if (k === 'w') setMode('translate'); else if (k === 'e') setMode('rotate'); else if (k === 'r') setMode('scale');
   else if (k === 'f') viewPreset('threeq');
+  else if (k === '+' || k === '=') zoomBy(0.6);
+  else if (k === '-' || k === '_') zoomBy(1 / 0.6);
   else if ((k === 'delete' || k === 'backspace') && sel) removeObject(sel);
   else if (k === 'escape') select(null);
 });
