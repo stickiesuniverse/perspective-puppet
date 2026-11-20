@@ -1126,17 +1126,37 @@ function surfaceAt(cx, cy) {                 // first visible model surface unde
 function zoomAnchor(cx, cy) {
   const tDist = camera.position.distanceTo(controls.target);
   const p = surfaceAt(cx, cy);               // (leaves `ray` set for this point)
-  if (p && camera.position.distanceTo(p) < tDist * 4) return p;
-  return ray.ray.at(tDist, new V());         // nothing close under the pointer: aim at orbit-point depth
+  if (p && camera.position.distanceTo(p) < 3000) return p;   // any surface you point at, however near or far
+  return ray.ray.at(tDist, new V());         // only sky under the pointer: aim at orbit-point depth
+}
+function unstickOrbit() {                    // a saved camera whose orbit point sits right at the lens: move it onto what's in view
+  const fwd = controls.target.clone().sub(camera.position);
+  if (!(fwd.length() < 0.25)) return;
+  camera.lookAt(controls.target); camera.updateMatrixWorld(); world.updateMatrixWorld(true);
+  const r = glc.getBoundingClientRect(), p = surfaceAt(r.left + r.width / 2, r.top + r.height / 2);
+  const d = p ? camera.position.distanceTo(p) : 0;
+  if (d > 0.25 && d < 200) reseatTarget(p);
+  else controls.target.copy(camera.position).addScaledVector(fwd.normalize(), 3);
+}
+function reseatTarget(anchor) {              // put the orbit point straight ahead at the depth of what you zoom toward
+  const fwd = controls.target.clone().sub(camera.position).normalize();
+  const depth = anchor.clone().sub(camera.position).dot(fwd);
+  if (depth > ZOOM_MIN) controls.target.copy(camera.position).addScaledVector(fwd, depth);
 }
 function applyZoom(s, anchor) {              // s < 1 = closer
+  if (anchor && s < 1) reseatTarget(anchor);   // so zoom speed matches the real distance to that spot
+  if (anchor && s > 1) {                        // zooming out with the orbit point stuck right at the lens: free it first
+    const t = camera.position.distanceTo(controls.target), a = camera.position.distanceTo(anchor);
+    if (a > t * 1.5 && a < 200) reseatTarget(anchor);
+  }
   const d = camera.position.distanceTo(controls.target);
   if (!(d > 0) || !isFinite(s)) return false;
   s = clamp(d * s, ZOOM_MIN, ZOOM_MAX) / d;
   if (Math.abs(s - 1) < 1e-9) return false;
-  const c = anchor ? anchor.clone() : controls.target.clone();
+  const toward = anchor && s < 1;               // in: close in on the spot; out: back away from the orbit point
+  const c = toward ? anchor.clone() : controls.target.clone();
   camera.position.sub(c).multiplyScalar(s).add(c);
-  if (anchor) controls.target.sub(c).multiplyScalar(s).add(c);
+  if (toward) controls.target.sub(c).multiplyScalar(s).add(c);
   return true;
 }
 const zoomQ = { log: 0, anchor: null, t: 0, inward: true, x: -1e9, y: -1e9 };
@@ -2539,7 +2559,7 @@ async function loadScene(it) {
     } catch (e) { console.warn(e); }
   }
   const c = it.data && it.data.camera;
-  if (c) { tween = null; camera.position.fromArray(c.p); controls.target.fromArray(c.t); setFocal(c.f || 35, false); $('#roll').value = c.roll || 0; $('#roll').dispatchEvent(new Event('input')); }
+  if (c) { tween = null; camera.position.fromArray(c.p); controls.target.fromArray(c.t); setFocal(c.f || 35, false); $('#roll').value = c.roll || 0; $('#roll').dispatchEvent(new Event('input')); unstickOrbit(); }
   Lib.sceneDetached = false; ST.set('pp3d.sceneDetached', false);
   Lib.sceneId = it.id; Lib.sceneName = it.name; Lib.sceneSig = sceneSig(); ST.set('pp3d.sceneId', { id: it.id, name: it.name }); ST.set('pp3d.sceneSig', Lib.sceneSig);
   renderList(); renderInspector(); save(); renderLibBadge();
