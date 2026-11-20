@@ -146,6 +146,11 @@ textarea:focus{border-color:var(--accent)}
 .dt{font-size:11px;color:var(--mute)}
 .lcard .acts{display:flex;flex-wrap:wrap;gap:4px;margin-top:7px}
 .lcard .acts .btn{padding:3px 8px;font-size:12px}
+.looks{display:flex;flex-direction:column;gap:6px}
+.lkrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.lk{display:flex;align-items:center;gap:6px;font-size:12.5px;color:#bdb9b1;min-width:150px}
+.lk select{flex:1;min-width:90px}
+.lkrow input[type=color]{width:34px;height:26px;border:1px solid var(--line);border-radius:6px;background:none;padding:1px}
 .syncbox{max-width:680px}
 .syncchip{font-size:12px!important}
 .syncchip.bad{border-color:var(--red);color:var(--red)}
@@ -272,7 +277,7 @@ body.mobile.dragging #stage::after{font-size:16px}
       </form>
       <div class="row" style="margin-top:9px">
         <div class="seg" id="kindSeg"><button data-v="auto" class="on">Auto</button><button data-v="character">Character</button><button data-v="prop">Prop</button></div>
-        <div class="seg" id="styleSeg" title="How characters and props look. Realistic is easier to draw from; Blocky is quick and simple."><button data-v="blocky" type="button">Blocky</button><button data-v="realistic" type="button">Realistic</button></div>
+        <div class="seg" id="styleSeg" title="Cartoon: your own drawing style (big round head, clean shapes, ink outlines). Realistic: lifelike anatomy."><button data-v="cartoon" type="button">Cartoon</button><button data-v="realistic" type="button">Realistic</button></div>
         <div class="seg" id="qualSeg" title="Detailed takes longer but gives better shapes"><button data-v="default" class="on">Fast</button><button data-v="complex">Detailed</button></div>
       </div>
       <details id="aiBox" class="aibox">
@@ -422,7 +427,7 @@ import { OutlineEffect } from 'three/addons/effects/OutlineEffect.js';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 // "blocky" (default) or "realistic": how characters and props are drawn, and what the AI is asked for
-let modelStyle = (() => { try { return JSON.parse(localStorage.getItem('pp3d.style') || '"blocky"') === 'realistic' ? 'realistic' : 'blocky'; } catch { return 'blocky'; } })();
+let modelStyle = (() => { try { return JSON.parse(localStorage.getItem('pp3d.style') || '"cartoon"') === 'realistic' ? 'realistic' : 'cartoon'; } catch { return 'cartoon'; } })();
 
 const $ = s => document.querySelector(s);
 const D2R = Math.PI / 180, V = THREE.Vector3;
@@ -435,7 +440,7 @@ const renderer = new THREE.WebGLRenderer({ canvas: glc, antialias: true, preserv
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-const outline = new OutlineEffect(renderer, { defaultThickness: 0.0042, defaultColor: [0.06, 0.06, 0.08] });
+const outline = new OutlineEffect(renderer, { defaultThickness: 0.0055, defaultColor: [0.03, 0.03, 0.04] });
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#e9e6df');
 const camera = new THREE.PerspectiveCamera(50, 1, 0.02, 800);
@@ -498,7 +503,7 @@ function makePart(p, extra = {}) {
     g = cachedGeo('pyr', () => { const q = new THREE.ConeGeometry(0.5 * Math.SQRT2, 1, 4); q.rotateY(Math.PI / 4); return q; });
   } else if (shape === 'wedge' || shape === 'ramp') {
     g = cachedGeo('wedge', wedgeGeo);
-  } else if (modelStyle === 'realistic' && !extra.body) {
+  } else if (!extra.body) {
     const q = s.map(v => +v.toFixed(3)), r = Math.min(Math.min(...q) * 0.22, 0.05);
     g = cachedGeo('rb' + q.join('_'), () => new RoundedBoxGeometry(q[0], q[1], q[2], 3, r)); sc = [1, 1, 1];
   } else {
@@ -512,7 +517,7 @@ function makePart(p, extra = {}) {
   m.rotation.set(num(r[0]) * D2R, num(r[1]) * D2R, num(r[2]) * D2R);
   m.castShadow = m.receiveShadow = true;
   const op = p.opacity != null ? clamp(num(p.opacity, 1), 0.1, 1) : 1;
-  m.userData = { styleable: true, color: normColor(p.color), metal: !!p.metal, opacity: op, label: p.name || '', ...extra };
+  m.userData = { styleable: true, color: normColor(p.color), metal: !!p.metal, opacity: op, label: p.name || '', size: s, ...extra };
   return m;
 }
 
@@ -522,13 +527,13 @@ const toonGrad = (() => { const t = new THREE.DataTexture(new Uint8Array([70, 16
 const matCache = new Map();
 function getMat(ud) {
   const hl = !!ud.hl;
-  const k = [style, ud.color, ud.metal ? 1 : 0, ud.opacity, hl ? 1 : 0, ud.joint ? 1 : 0].join('|');
+  const k = [style, ud.color, ud.metal ? 1 : 0, ud.opacity, hl ? 1 : 0, ud.joint ? 1 : 0, ud.feature ? 1 : 0].join('|');
   if (matCache.has(k)) return matCache.get(k);
   let m; const c = new THREE.Color(ud.color);
   switch (style) {
-    case 'clay': m = new THREE.MeshStandardMaterial({ color: ud.joint ? 0xb3ab9f : 0xcfc9bf, roughness: 0.92 }); break;
+    case 'clay': m = new THREE.MeshStandardMaterial({ color: ud.feature ? c : ud.joint ? 0xb3ab9f : 0xcfc9bf, roughness: 0.92 }); break;
     case 'comic': m = new THREE.MeshToonMaterial({ color: c, gradientMap: toonGrad, transparent: ud.opacity < 1, opacity: ud.opacity }); break;
-    case 'ink': m = new THREE.MeshToonMaterial({ color: ud.joint ? 0xe6e2da : 0xf7f5f0, gradientMap: toonGrad }); break;
+    case 'ink': m = new THREE.MeshToonMaterial({ color: ud.feature ? c : ud.joint ? 0xe6e2da : 0xf7f5f0, gradientMap: toonGrad }); break;
     case 'wire': m = new THREE.MeshBasicMaterial({ color: 0x2b2f38, wireframe: true }); break;
     case 'silhouette': m = new THREE.MeshBasicMaterial({ color: 0x15161a }); break;
     default: m = new THREE.MeshStandardMaterial({ color: c, roughness: ud.metal ? 0.32 : 0.78, metalness: ud.metal ? 0.65 : 0.02, transparent: ud.opacity < 1, opacity: ud.opacity });
@@ -585,12 +590,25 @@ function ellipse(ax, ay, plane, off = [0, 0, 0]) {
   const l = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), lineMat); l.userData.construction = true; return l;
 }
 
+const LOOK_DEFAULT = { hair: 'short', hairColor: '#1d1d1f', eyes: 'ovals', eyeColor: '#22e6ff', brows: true, mouth: 'line', shirt: 'tee', shirtColor: '#3d9be0', pants: 'long', pantsColor: '#e4e4e4', shoes: true, shoeColor: '#f4f4f4' };
+// characters made before outfits existed carried their hair and clothes as parts: give those a bare look
+const LOOK_LEGACY = { ...LOOK_DEFAULT, hair: 'none', shirt: 'none', pants: 'none', shoes: false };
+const LOOK_OPTS = { hair: ['short', 'spiky', 'curly', 'afro', 'bun', 'ponytail', 'long', 'dreads', 'none'], eyes: ['ovals', 'dots', 'lines', 'glasses', 'sunglasses', 'visor'], mouth: ['line', 'smile', 'open'], shirt: ['tee', 'long', 'tank', 'none'], pants: ['long', 'shorts', 'skirt', 'dress', 'none'] };
+function resolveLook(def) {
+  const base = def.look ? LOOK_DEFAULT : ((def.parts || []).length ? LOOK_LEGACY : LOOK_DEFAULT);
+  const l = { ...base, ...(def.look || {}) };
+  for (const [k, opts] of Object.entries(LOOK_OPTS)) if (!opts.includes(l[k])) l[k] = base[k];
+  for (const k of ['hairColor', 'eyeColor', 'shirtColor', 'pantsColor', 'shoeColor']) l[k] = normColor(l[k], base[k]);
+  l.brows = l.brows !== false; l.shoes = l.shoes !== false && l.shoes !== 'none';
+  return l;
+}
 function buildCharacter(def) {
   const b = { ...BODY_DEFAULT, ...(def.body || {}) };
   b.height = clamp(num(b.height, 1.8), 0.3, 6); b.heads = clamp(num(b.heads, 7.5), 2, 10);
   b.build = clamp(num(b.build, 1), 0.5, 2); b.shoulders = clamp(num(b.shoulders, 1), 0.6, 1.7);
   b.hips = clamp(num(b.hips, 1), 0.6, 1.6); b.bust = clamp(num(b.bust, 0), 0, 1); b.skin = normColor(b.skin, BODY_DEFAULT.skin);
-  const H = b.height, hh = H / b.heads, k = (H - hh) / 1.548, hs = hh / 0.24, W = b.build, wm = 0.5 + 0.5 * W;
+  const heads = modelStyle === 'realistic' ? b.heads : clamp(b.heads * 0.42, 2.3, 4);
+  const H = b.height, hh = H / heads, k = (H - hh) / 1.548, hs = hh / 0.24, W = b.build, wm = 0.5 + 0.5 * W;
   const skin = b.skin, jc = shade(skin, -0.1);
   const fig = new THREE.Group(), bones = {}, skins = {};
   const bone = (name, parent, x, y, z, scl) => {
@@ -600,106 +618,210 @@ function buildCharacter(def) {
     const s = new THREE.Group(); s.scale.set(...scl); s.userData.bone = name; g.add(s); skins[name] = s; return s;
   };
   const P = (s, spec, joint = false) => { const m = makePart({ ...spec, color: joint ? jc : skin }, { body: true, joint }); s.add(m); return m; };
-  // ---- body meshes: blocky mannequin or realistic sculpted figure (same bones either way) ----
+  // ---- body meshes: "cartoon" (the user's own drawing style) or "realistic"; same bones either way ----
   const R = modelStyle === 'realistic';
-  const M = (s, geo, { pos = [0, 0, 0], rot = [0, 0, 0], scl = [1, 1, 1], joint = false } = {}) => {
+  const look = resolveLook(def);
+  let TAG = '';                                  // which body region the next meshes belong to (clothing uses it)
+  const M = (s, geo, { pos = [0, 0, 0], rot = [0, 0, 0], scl = [1, 1, 1], joint = false, color, feature = false, kind = 'body' } = {}) => {
     const m = new THREE.Mesh(geo, PLACE); m.position.set(...pos); m.rotation.set(rot[0] * D2R, rot[1] * D2R, rot[2] * D2R); m.scale.set(...scl);
-    m.castShadow = m.receiveShadow = true; m.userData = { styleable: true, color: joint ? jc : skin, metal: false, opacity: 1, body: true, joint }; s.add(m); return m;
+    m.castShadow = m.receiveShadow = true;
+    m.userData = { styleable: true, color: color || (joint ? jc : skin), metal: false, opacity: 1, joint, feature, tag: TAG };
+    m.userData[kind] = true;                     // body | outfit | hair
+    s.add(m); return m;
   };
   const SPH = cachedGeo('rsph', () => new THREE.SphereGeometry(0.5, 36, 26));
+  const CONE = cachedGeo('rcone', () => new THREE.ConeGeometry(0.5, 1, 24));
   const ball = (s, size, pos, o = {}) => M(s, SPH, { pos, scl: size, ...o });
   const lathe = (key, pts) => cachedGeo('lathe_' + key, () => new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), 32));
   const caps = (s, d, len, pos, rot = [0, 0, 0], o = {}) => M(s, cachedGeo(`rcap${d}_${len}`, () => new THREE.CapsuleGeometry(d / 2, Math.max(len - d, 0.001), 6, 16)), { pos, rot, ...o });
-  const rbox = (s, size, pos, rot = [0, 0, 0]) => M(s, cachedGeo('rbox' + size.join('_'), () => new RoundedBoxGeometry(size[0], size[1], size[2], 4, Math.min(...size) * 0.42)), { pos, rot });
-  const realHead = s => {
-    ball(s, [0.185, 0.205, 0.215], [0, 0.02, -0.01]);             // cranium
-    ball(s, [0.145, 0.16, 0.16], [0, -0.035, 0.025]);             // face + jaw
-    ball(s, [0.062, 0.05, 0.05], [0, -0.094, 0.064]);             // chin
-    for (const sd of [1, -1]) {
-      ball(s, [0.05, 0.04, 0.042], [sd * 0.05, -0.012, 0.074]);   // cheekbones
-      ball(s, [0.03, 0.016, 0.016], [sd * 0.033, 0.006, 0.097], { joint: true }); // eyes
-      ball(s, [0.02, 0.056, 0.036], [sd * 0.094, -0.004, -0.006]); // ears
-    }
-    caps(s, 0.024, 0.13, [0, 0.026, 0.094], [0, 0, 90]);          // brow ridge
-    ball(s, [0.024, 0.05, 0.034], [0, -0.016, 0.107]);            // nose bridge
-    ball(s, [0.031, 0.024, 0.026], [0, -0.04, 0.114]);            // nose tip
-    caps(s, 0.015, 0.046, [0, -0.063, 0.098], [0, 0, 90], { joint: true }); // mouth line
-  };
-  // Realistic hand. Frame: origin at the wrist, fingers point down (-Y), the hand's width runs along Z
-  // with the thumb toward +Z (front), and the palm faces the body: -X on the left hand, +X on the right.
-  // So "toward the palm" is -sd on X. A rotation about Z by -sd*a swings a downward finger toward the palm.
-  // Fingers are chains of joints: each segment hangs from the end of the one before, so nothing drifts apart.
+  const rbox = (s, size, pos, rot = [0, 0, 0], o = {}) => M(s, cachedGeo('rbox' + size.join('_'), () => new RoundedBoxGeometry(size[0], size[1], size[2], 4, Math.min(...size) * 0.42)), { pos, rot, ...o });
+  const torusArc = (s, size, arc, pos, rot, o = {}) => M(s, cachedGeo(`tor${size.join('_')}_${arc}`, () => new THREE.TorusGeometry(size[0] / 2 - size[2] / 2, size[2] / 2, 8, 32, arc * D2R)), { pos, rot, ...o });
+  // Hand. Frame: origin at the wrist, fingers point down (-Y), width along Z with the thumb toward +Z,
+  // palm facing the body (-X on the left hand, +X on the right): "toward the palm" is -sd on X.
   const joint = (parent, pos, rotDeg) => {
     const g = new THREE.Group(); g.position.set(...pos);
     g.rotation.set(rotDeg[0] * D2R, rotDeg[1] * D2R, rotDeg[2] * D2R); parent.add(g); return g;
   };
-  const phalanx = (parent, d, len, rotDeg) => {   // one finger bone: capsule from the joint down to the next joint
+  const phalanx = (parent, d, len, rotDeg) => {
     const g = joint(parent, [0, 0, 0], rotDeg);
     caps(g, d, len, [0, -len / 2, 0]);
-    return joint(g, [0, -(len - d * 0.45), 0], [0, 0, 0]);   // next joint, slightly overlapped so it looks continuous
+    return joint(g, [0, -(len - d * 0.45), 0], [0, 0, 0]);
   };
-  const realHand = (s, sd) => {
-    const P = -sd;                                                // sign of "toward the palm" on X
-    rbox(s, [0.03, 0.088, 0.082], [0, -0.05, 0.002]);             // palm block (metacarpals)
-    ball(s, [0.022, 0.056, 0.036], [P * 0.011, -0.036, 0.026]);   // thenar pad (base of the thumb, palm side)
-    ball(s, [0.02, 0.06, 0.03], [P * 0.01, -0.05, -0.027]);       // hypothenar pad (pinky side of the palm)
-    //            z position, knuckle y, total length, thickness, splay (deg about X), curl per joint (deg)
+  const realHand = (s, sd, chunk = 1) => {
+    const P = -sd;
+    rbox(s, [0.03 * chunk, 0.088, 0.082], [0, -0.05, 0.002]);
+    ball(s, [0.022, 0.056, 0.036], [P * 0.011, -0.036, 0.026]);
+    ball(s, [0.02, 0.06, 0.03], [P * 0.01, -0.05, -0.027]);
     const F = [
-      { z: 0.0285, y: -0.093, len: 0.079, d: 0.0175, splay: -4, curl: [8, 12, 8] },    // index (next to the thumb)
-      { z: 0.0095, y: -0.095, len: 0.085, d: 0.018, splay: -1, curl: [10, 15, 10] },   // middle (longest)
+      { z: 0.0285, y: -0.093, len: 0.079, d: 0.0175, splay: -4, curl: [8, 12, 8] },    // index
+      { z: 0.0095, y: -0.095, len: 0.085, d: 0.018, splay: -1, curl: [10, 15, 10] },   // middle
       { z: -0.0095, y: -0.093, len: 0.081, d: 0.017, splay: 2, curl: [13, 18, 12] },   // ring
-      { z: -0.0275, y: -0.088, len: 0.064, d: 0.0155, splay: 6, curl: [16, 22, 14] },  // pinky (knuckle sits higher)
+      { z: -0.0275, y: -0.088, len: 0.064, d: 0.0155, splay: 6, curl: [16, 22, 14] },  // pinky
     ];
     for (const f of F) {
-      ball(s, [0.016, 0.014, f.d * 1.05], [-P * 0.008, f.y + 0.004, f.z]);   // knuckle bump on the back of the hand
+      if (R) ball(s, [0.016, 0.014, f.d * 1.05], [-P * 0.008, f.y + 0.004, f.z]);
       const base = joint(s, [0, f.y, f.z], [f.splay, 0, 0]);
-      let j = phalanx(base, f.d, f.len * 0.45, [0, 0, P * f.curl[0]]);       // proximal phalanx
-      j = phalanx(j, f.d * 0.92, f.len * 0.31, [0, 0, P * f.curl[1]]);       // middle phalanx
-      phalanx(j, f.d * 0.85, f.len * 0.27, [0, 0, P * f.curl[2]]);           // distal phalanx (fingertip)
+      const d = f.d * chunk;
+      let j = phalanx(base, d, f.len * 0.45, [0, 0, P * f.curl[0]]);
+      j = phalanx(j, d * 0.92, f.len * 0.31, [0, 0, P * f.curl[1]]);
+      phalanx(j, d * 0.85, f.len * 0.27, [0, 0, P * f.curl[2]]);
     }
-    // Thumb: starts low on the front-palm corner of the hand, angles forward (+Z) and across toward the palm
-    // relaxed: it lies along the index finger, a little in front of it and turned slightly toward the palm,
-    // with the tip about level with the index finger's first joint
     const tb = joint(s, [P * 0.006, -0.022, 0.033], [-15, 0, P * 8]);
-    let t = phalanx(tb, 0.024, 0.046, [0, 0, 0]);                // metacarpal (the fleshy base)
-    t = phalanx(t, 0.02, 0.036, [-4, 0, P * 6]);                 // proximal phalanx
-    phalanx(t, 0.0175, 0.029, [-2, 0, P * 8]);                   // distal phalanx (thumb tip)
+    let t = phalanx(tb, 0.024 * chunk, 0.046, [0, 0, 0]);
+    t = phalanx(t, 0.02 * chunk, 0.036, [-4, 0, P * 6]);
+    phalanx(t, 0.0175 * chunk, 0.029, [-2, 0, P * 8]);
   };
+  // ---- faces ----
+  const INK = '#141414';
+  const realHead = s => {
+    TAG = 'head';
+    ball(s, [0.185, 0.205, 0.215], [0, 0.02, -0.01]);
+    ball(s, [0.145, 0.16, 0.16], [0, -0.035, 0.025]);
+    ball(s, [0.062, 0.05, 0.05], [0, -0.094, 0.064]);
+    for (const sd of [1, -1]) {
+      ball(s, [0.05, 0.04, 0.042], [sd * 0.05, -0.012, 0.074]);
+      if (!['sunglasses', 'visor'].includes(look.eyes)) ball(s, [0.03, 0.016, 0.016], [sd * 0.033, 0.006, 0.097], { joint: true });
+      ball(s, [0.02, 0.056, 0.036], [sd * 0.094, -0.004, -0.006]);
+    }
+    caps(s, 0.024, 0.13, [0, 0.026, 0.094], [0, 0, 90]);
+    ball(s, [0.024, 0.05, 0.034], [0, -0.016, 0.107]);
+    ball(s, [0.031, 0.024, 0.026], [0, -0.04, 0.114]);
+    caps(s, 0.015, 0.046, [0, -0.063, 0.098], [0, 0, 90], { joint: true });
+    eyewear(s, 0.006);
+  };
+  // cartoon head: big round face, round ears, black oval eyes, tiny nose, simple mouth
+  const toonHead = s => {
+    TAG = 'head';
+    ball(s, [0.205, 0.215, 0.2], [0, 0, 0]);
+    for (const sd of [1, -1]) ball(s, [0.03, 0.058, 0.046], [sd * 0.1, -0.012, 0.002]);
+    const F = { feature: true, kind: 'body' };
+    const e = look.eyes;
+    for (const sd of [1, -1]) {
+      if (e === 'dots') ball(s, [0.05, 0.05, 0.016], [sd * 0.038, 0.004, 0.089], { ...F, color: INK });
+      else if (e === 'lines') ball(s, [0.016, 0.06, 0.014], [sd * 0.03, 0, 0.094], { ...F, color: INK });
+      else if (e === 'ovals' || e === 'glasses') ball(s, [0.028, 0.058, 0.016], [sd * 0.033, 0, 0.093], { ...F, color: INK });
+      if (look.brows && e !== 'visor') caps(s, 0.0065, 0.036, [sd * 0.034, 0.05, 0.088], [0, 0, 90 + sd * 8], { ...F, color: INK });
+    }
+    ball(s, [0.014, 0.02, 0.014], [0, -0.028, 0.097], { joint: true });
+    if (look.mouth === 'smile') torusArc(s, [0.036, 0.036, 0.0065], 180, [0, -0.05, 0.088], [20, 0, 180], { ...F, color: INK });
+    else if (look.mouth === 'open') { ball(s, [0.04, 0.026, 0.012], [0, -0.062, 0.082], { ...F, color: '#2a1414' }); ball(s, [0.022, 0.01, 0.006], [0, -0.069, 0.087], { ...F, color: '#e2264d' }); }
+    else caps(s, 0.007, 0.028, [0, -0.062, 0.084], [0, 0, 90], { ...F, color: INK });
+    eyewear(s, 0);
+  };
+  function eyewear(s, dz) {                       // glasses, sunglasses and visors work on either face
+    const F = { feature: true, kind: 'outfit' }, e = look.eyes, lens = look.eyeColor || '#22e6ff';
+    if (e === 'sunglasses') {
+      for (const sd of [1, -1]) ball(s, [0.062, 0.036, 0.018], [sd * 0.035, 0.008, 0.092 + dz], { ...F, color: INK });
+      caps(s, 0.008, 0.02, [0, 0.016, 0.1 + dz], [0, 0, 90], { ...F, color: INK });
+    } else if (e === 'glasses') {
+      for (const sd of [1, -1]) torusArc(s, [0.052, 0.07, 0.006], 360, [sd * 0.034, 0, 0.099 + dz], [0, 0, 0], { ...F, color: INK });
+      caps(s, 0.005, 0.016, [0, 0.002, 0.103 + dz], [0, 0, 90], { ...F, color: INK });
+    } else if (e === 'visor') {
+      ball(s, [0.214, 0.046, 0.206], [0, 0.012, 0.004 + dz], { ...F, color: lens });
+    }
+  }
+  // ---- hairstyles (head frame; a cap sits behind the face so the face always shows) ----
+  const hair = s => {
+    TAG = 'hair';
+    const H = { kind: 'hair', color: look.hairColor || '#1d1d1f' }, h = look.hair;
+    if (!h || h === 'none') return;
+    const cap = (sz = [0.224, 0.172, 0.22], y = 0.056, z = -0.014) => ball(s, sz, [0, y, z], H);
+    const lumps = (cx, cy, cz, rx, ry, rz, r, n) => {
+      for (let i = 0; i < n; i++) {
+        const a = i / n * Math.PI * 2, b = (i % 3) * 0.35 + 0.15;
+        const x = cx + Math.cos(a) * rx * Math.cos(b), y = cy + Math.sin(b) * ry, z = cz + Math.sin(a) * rz * Math.cos(b);
+        if (z > 0.05 && y < 0.06) continue;      // keep the face clear
+        ball(s, [r, r, r], [x, y, z], H);
+      }
+    };
+    if (h === 'short') cap();
+    else if (h === 'curly') { cap([0.236, 0.176, 0.232], 0.056, -0.016); lumps(0, 0.06, -0.016, 0.112, 0.08, 0.11, 0.07, 14); }
+    else if (h === 'afro') { ball(s, [0.33, 0.27, 0.31], [0, 0.1, -0.05], H); lumps(0, 0.1, -0.05, 0.16, 0.12, 0.15, 0.1, 18); }
+    else if (h === 'bun') { cap(); ball(s, [0.1, 0.095, 0.1], [0, 0.14, -0.03], H); }
+    else if (h === 'ponytail') { cap(); ball(s, [0.04, 0.04, 0.04], [0, 0.04, -0.105], H); const g = joint(s, [0, 0.04, -0.11], [28, 0, 0]); caps(g, 0.06, 0.22, [0, -0.1, 0], [0, 0, 0], H); }
+    else if (h === 'long') { cap(); rbox(s, [0.21, 0.27, 0.07], [0, -0.075, -0.075], [0, 0, 0], H); for (const sd of [1, -1]) caps(s, 0.046, 0.2, [sd * 0.099, -0.07, -0.004], [0, 0, 0], H); }
+    else if (h === 'dreads') {
+      cap();
+      for (let i = 0; i < 16; i++) {
+        const a = -150 + i * 20; if (Math.abs(a) < 45) continue;   // leave the face open
+        const ar = a * D2R, x = Math.sin(ar) * 0.1, z = Math.cos(ar) * 0.1;
+        const g = joint(s, [x, 0.05, z], [Math.cos(ar) * -10, 0, Math.sin(ar) * -10]);
+        caps(g, 0.026, 0.24, [0, -0.11, 0], [0, 0, 0], H);
+      }
+    } else if (h === 'spiky') {
+      cap();
+      // [x, y, z, height, base, tilt back, lean side]: tallest in the middle, leaning a little to one side
+      for (const [x, y, z, ht, d, rx, rz] of [[-0.07, 0.085, 0, 0.16, 0.08, -15, 32], [-0.036, 0.105, 0.02, 0.2, 0.085, -18, 16], [0, 0.112, 0.01, 0.23, 0.09, -22, 2], [0.036, 0.105, 0, 0.21, 0.085, -24, -12], [0.07, 0.085, -0.01, 0.17, 0.08, -20, -30], [-0.04, 0.095, -0.05, 0.17, 0.08, -45, 16], [0.032, 0.095, -0.06, 0.18, 0.08, -50, -10], [0, 0.055, -0.09, 0.14, 0.08, -78, 0]]) {
+        const g = joint(s, [x, y, z], [rx, 0, rz]);
+        M(g, CONE, { pos: [0, ht / 2, 0], scl: [d, ht, d], ...H });
+      }
+    }
+  };
+  // ---- outfit: clothing is the body's own shape, slightly inflated, so the body can never poke through ----
+  const COVER = {
+    tee: ['chest', 'abdomen', 'shoulder', 'uarm-half'], long: ['chest', 'abdomen', 'shoulder', 'uarm', 'elbow', 'farm'], tank: ['chest', 'abdomen'],
+    pants: ['pelvis', 'thigh', 'knee', 'shin'], shorts: ['pelvis', 'thigh-half'], skirt: ['pelvis'], dress: ['chest', 'abdomen', 'pelvis'], shoes: ['ankle', 'foot'],
+  };
+  const INFL = { chest: 1.06, abdomen: 1.085, pelvis: 1.06, shoulder: 1.12, uarm: 1.17, elbow: 1.15, farm: 1.19, thigh: 1.12, knee: 1.12, shin: 1.16, ankle: 1.32, foot: 1.28 };
+  const dress = () => {
+    const layers = [];
+    if (look.pants === 'long') layers.push([COVER.pants, look.pantsColor]);
+    if (look.pants === 'shorts') layers.push([COVER.shorts, look.pantsColor]);
+    if (look.pants === 'skirt' || look.pants === 'dress') layers.push([look.pants === 'dress' ? COVER.dress : COVER.skirt, look.pantsColor]);
+    if (COVER[look.shirt]) layers.push([COVER[look.shirt], look.shirtColor, 1.02]);    // shirts sit over pants
+    if (look.shoes) layers.push([COVER.shoes, look.shoeColor]);
+    for (const [cover, color, extra = 1] of layers) {
+      for (const [name, sk] of Object.entries(skins)) {
+        for (const m of [...sk.children]) {
+          if (!m.isMesh || !m.userData.body || !m.userData.tag) continue;
+          const t = m.userData.tag, half = cover.includes(t + '-half');
+          if (!cover.includes(t) && !half) continue;
+          if (half && m.geometry.type !== 'LatheGeometry') continue;   // a half sleeve or short leg covers the tube only
+          const f = (INFL[t] || 1.1) * extra, c = new THREE.Mesh(m.geometry, PLACE);
+          c.position.copy(m.position); c.rotation.copy(m.rotation);
+          c.scale.set(m.scale.x * f, m.scale.y * (half ? 0.52 : 1 + (f - 1) * 0.5), m.scale.z * f);
+          c.castShadow = c.receiveShadow = true;
+          c.userData = { styleable: true, color: normColor(color, '#888'), metal: false, opacity: 1, outfit: true, tag: t };
+          sk.add(c);
+        }
+      }
+    }
+    if (look.pants === 'skirt' || look.pants === 'dress') {             // a flared skirt hanging from the hips
+      TAG = 'skirt'; const L = look.pants === 'dress' ? 0.56 : 0.34;
+      M(skins.hips, lathe('skirt' + L, [[0, 0.06], [0.175, 0.05], [0.2, -L * 0.45], [0.245, -L], [0, -L + 0.004]]), { scl: [1, 1, 0.82], color: normColor(look.pantsColor, '#888'), kind: 'outfit' });
+    }
+  };
+  // ---- the bodies ----
   let s;
   s = bone('hips', null, 0, 0.972 * k, 0, [k * b.hips * wm, k, k * W]);
+  TAG = 'pelvis';
   if (R) { ball(s, [0.32, 0.2, 0.21], [0, -0.005, 0]); for (const sd of [1, -1]) ball(s, [0.15, 0.17, 0.15], [sd * 0.06, -0.04, -0.05]); }
-  else P(s, { shape: 'sphere', size: [0.33, 0.21, 0.2], pos: [0, -0.01, 0] });
+  else ball(s, [0.3, 0.19, 0.2], [0, -0.005, 0]);
   s = bone('spine', 'hips', 0, 0.084 * k, 0, [k * wm, k, k * W]);
+  TAG = 'abdomen';
   if (R) { M(s, lathe('abd', [[0, -0.05], [0.125, -0.03], [0.118, 0.04], [0.121, 0.1], [0.135, 0.17], [0, 0.185]]), { scl: [1, 1, 0.68] }); ball(s, [0.17, 0.18, 0.06], [0, 0.06, 0.066]); }
-  else P(s, { shape: 'cylinder', size: [0.25, 0.2, 0.165], taper: 1.06, pos: [0, 0.05, 0] });
+  else M(s, lathe('cabd', [[0, -0.06], [0.118, -0.05], [0.12, 0.05], [0.13, 0.16], [0, 0.175]]), { scl: [1, 1, 0.72] });
   s = bone('chest', 'spine', 0, 0.168 * k, 0, [k * b.shoulders * wm, k, k * W]);
+  TAG = 'chest';
   if (R) {
-    ball(s, [0.3, 0.3, 0.21], [0, 0.1, 0]);                         // ribcage
-    ball(s, [0.31, 0.09, 0.15], [0, 0.205, -0.016]);                // shoulders / trapezius
+    ball(s, [0.3, 0.3, 0.21], [0, 0.1, 0]);
+    ball(s, [0.31, 0.09, 0.15], [0, 0.205, -0.016]);
     for (const sd of [1, -1]) {
-      ball(s, [0.1, 0.13, 0.045], [sd * 0.066, 0.13, -0.088]);      // shoulder blades
-      if (b.bust < 0.3) ball(s, [0.13, 0.095, 0.06], [sd * 0.06, 0.14, 0.084], { rot: [0, 0, sd * -8] }); // pecs
+      ball(s, [0.1, 0.13, 0.045], [sd * 0.066, 0.13, -0.088]);
+      if (b.bust < 0.3) ball(s, [0.13, 0.095, 0.06], [sd * 0.06, 0.14, 0.084], { rot: [0, 0, sd * -8] });
     }
-  } else {
-    P(s, { shape: 'sphere', size: [0.31, 0.29, 0.21], pos: [0, 0.108, 0] });
-    P(s, { shape: 'capsule', size: [0.085, 0.37, 0.085], rot: [0, 0, 90], pos: [0, 0.19, -0.012] });
-  }
+  } else M(s, lathe('cchest', [[0, -0.01], [0.13, 0], [0.143, 0.1], [0.148, 0.18], [0.125, 0.235], [0.06, 0.26], [0, 0.262]]), { scl: [1, 1, 0.72] });
   if (b.bust > 0.04) for (const sd of [1, -1]) { const f = 0.55 + 0.6 * b.bust;
-    if (R) ball(s, [0.12 * f, 0.11 * f, 0.105 * f], [sd * 0.058, 0.075, 0.068 + 0.026 * f]);
-    else P(s, { shape: 'sphere', size: [0.115 * f, 0.105 * f, 0.1 * f], pos: [sd * 0.058, 0.07, 0.07 + 0.025 * f] }); }
+    ball(s, [0.12 * f, 0.11 * f, 0.105 * f], [sd * 0.058, 0.075, (R ? 0.068 : 0.06) + 0.026 * f]); }
   const nw = 0.7 + 0.3 * W;
   s = bone('neck', 'chest', 0, 0.24 * k, 0, [k * nw, k, k * nw]);
+  TAG = 'neck';
   if (R) M(s, lathe('neck', [[0, -0.03], [0.058, -0.025], [0.049, 0.04], [0.05, 0.1], [0, 0.115]]), { pos: [0, 0, 0.004], scl: [1, 1, 0.95] });
-  else P(s, { shape: 'cylinder', size: [0.095, 0.15, 0.1], taper: 0.92, pos: [0, 0.035, 0.004] });
+  else M(s, lathe('cneck', [[0, -0.03], [0.044, -0.03], [0.04, 0.1], [0, 0.105]]));
   s = bone('head', 'neck', 0, 0.084 * k, 0, [hs, hs, hs]);
-  s.position.y = 0.12 * hs;
-  if (R) realHead(s);
-  else {
-    P(s, { shape: 'sphere', size: [0.19, 0.215, 0.22], pos: [0, 0.014, -0.006] });
-    P(s, { shape: 'sphere', size: [0.135, 0.13, 0.15], pos: [0, -0.052, 0.03] });
-    P(s, { shape: 'cone', size: [0.032, 0.05, 0.034], rot: [90, 0, 0], pos: [0, -0.012, 0.112] }, true);
-    for (const sd of [1, -1]) P(s, { shape: 'sphere', size: [0.022, 0.055, 0.035], pos: [sd * 0.094, -0.005, -0.004] }, true);
-  }
+  s.position.y = (R ? 0.12 : 0.098) * hs;          // cartoon heads sit lower: short neck, chin near the shoulders
+  if (R) realHead(s); else toonHead(s);
+  hair(s);
   const hg = new THREE.Group(); hg.userData.headLines = true;
   hg.add(ellipse(0.0985, 0.115, 'xz', [0, 0, -0.004]));
   hg.add(ellipse(0.128, 0.116, 'yz', [0, -0.008, 0]));
@@ -708,54 +830,49 @@ function buildCharacter(def) {
   for (const sd of [1, -1]) {
     const x = sd > 0 ? '_l' : '_r';
     s = bone('upperarm' + x, 'chest', sd * 0.165 * k * b.shoulders * wm, 0.2 * k, -0.006 * k, [k * W, k, k * W]);
-    if (R) {
-      ball(s, [0.112, 0.135, 0.112], [sd * 0.012, -0.03, 0]);       // deltoid
-      M(s, lathe('uarm', [[0, 0.01], [0.045, -0.02], [0.048, -0.08], [0.05, -0.14], [0.043, -0.24], [0.036, -0.33], [0, -0.345]]), { scl: [1, 1, 1.05] });
-      ball(s, [0.07, 0.12, 0.075], [0, -0.15, 0.012]);              // biceps
-    } else {
-      P(s, { shape: 'sphere', size: [0.105, 0.105, 0.105] }, true);
-      P(s, { shape: 'cylinder', size: [0.072, 0.31, 0.077], taper: 1.33, pos: [0, -0.17, 0] });
-    }
+    TAG = 'shoulder';
+    if (R) ball(s, [0.112, 0.135, 0.112], [sd * 0.012, -0.03, 0]); else ball(s, [0.104, 0.104, 0.104], [0, -0.004, 0]);
+    TAG = 'uarm';
+    if (R) { M(s, lathe('uarm', [[0, 0.01], [0.045, -0.02], [0.048, -0.08], [0.05, -0.14], [0.043, -0.24], [0.036, -0.33], [0, -0.345]]), { scl: [1, 1, 1.05] }); ball(s, [0.07, 0.12, 0.075], [0, -0.15, 0.012]); }
+    else M(s, lathe('cuarm', [[0, 0.01], [0.05, -0.01], [0.051, -0.17], [0.046, -0.33], [0, -0.345]]));
     s = bone('forearm' + x, 'upperarm' + x, 0, -0.336 * k, 0, [k * W, k, k * W]);
-    if (R) { ball(s, [0.07, 0.07, 0.07], [0, 0, -0.004]); M(s, lathe('farm', [[0, 0.012], [0.036, 0], [0.043, -0.06], [0.036, -0.15], [0.027, -0.25], [0.024, -0.276], [0, -0.282]]), { scl: [0.88, 1, 1.05] }); }
-    else {
-      P(s, { shape: 'sphere', size: [0.074, 0.074, 0.074] }, true);
-      P(s, { shape: 'cylinder', size: [0.05, 0.26, 0.058], taper: 1.42, pos: [0, -0.137, 0] });
-    }
+    TAG = 'elbow'; ball(s, R ? [0.07, 0.07, 0.07] : [0.092, 0.092, 0.092], [0, 0, -0.004]);
+    TAG = 'farm';
+    if (R) M(s, lathe('farm', [[0, 0.012], [0.036, 0], [0.043, -0.06], [0.036, -0.15], [0.027, -0.25], [0.024, -0.276], [0, -0.282]]), { scl: [0.88, 1, 1.05] });
+    else M(s, lathe('cfarm', [[0, 0.01], [0.046, 0], [0.045, -0.14], [0.039, -0.27], [0, -0.282]]), { scl: [0.95, 1, 1] });
     const hw = 0.75 + 0.25 * W;
     s = bone('hand' + x, 'forearm' + x, 0, -0.276 * k, 0, [k * hw, k, k * hw]);
-    if (R) realHand(s, sd);
-    else {
-      P(s, { shape: 'sphere', size: [0.052, 0.052, 0.052] }, true);
-      P(s, { shape: 'box', size: [0.032, 0.095, 0.082], pos: [0, -0.055, 0.003] });
-      P(s, { shape: 'box', size: [0.026, 0.075, 0.078], pos: [sd * 0.003, -0.14, 0.004], rot: [6, 0, 0] });
-      P(s, { shape: 'box', size: [0.022, 0.06, 0.022], pos: [-sd * 0.016, -0.045, 0.046], rot: [-25, 0, 0] });
-    }
+    TAG = 'hand'; realHand(s, sd, R ? 1 : 1.18);
     s = bone('thigh' + x, 'hips', sd * 0.096 * k * b.hips * wm, -0.036 * k, 0, [k * W, k, k * W]);
+    TAG = 'thigh';
     if (R) { M(s, lathe('thigh', [[0, 0.03], [0.075, 0], [0.08, -0.06], [0.075, -0.15], [0.065, -0.28], [0.05, -0.4], [0.045, -0.444], [0, -0.452]]), { pos: [0, 0, 0.005], scl: [0.95, 1, 1.05] }); ball(s, [0.1, 0.22, 0.08], [sd * 0.005, -0.2, 0.035]); }
-    else {
-      P(s, { shape: 'sphere', size: [0.135, 0.135, 0.135] }, true);
-      P(s, { shape: 'cylinder', size: [0.104, 0.43, 0.115], taper: 1.45, pos: [0, -0.222, 0.005] });
-    }
+    else M(s, lathe('cthigh', [[0, 0.03], [0.076, 0.01], [0.076, -0.1], [0.07, -0.3], [0.062, -0.444], [0, -0.452]]));
     s = bone('shin' + x, 'thigh' + x, 0, -0.444 * k, 0, [k * W, k, k * W]);
-    if (R) { ball(s, [0.05, 0.056, 0.04], [0, 0.005, 0.04]); M(s, lathe('shin', [[0, 0.025], [0.046, 0], [0.05, -0.08], [0.044, -0.18], [0.032, -0.32], [0.026, -0.4], [0.027, -0.42], [0, -0.426]]), { scl: [1, 1, 1.05] }); ball(s, [0.075, 0.17, 0.08], [0, -0.11, -0.025]); }
-    else {
-      P(s, { shape: 'sphere', size: [0.098, 0.098, 0.098] }, true);
-      P(s, { shape: 'cylinder', size: [0.068, 0.41, 0.078], taper: 1.5, pos: [0, -0.21, -0.006] });
-    }
+    TAG = 'knee'; if (R) ball(s, [0.05, 0.056, 0.04], [0, 0.005, 0.04]); else ball(s, [0.124, 0.124, 0.124], [0, 0, 0]);
+    TAG = 'shin';
+    if (R) { M(s, lathe('shin', [[0, 0.025], [0.046, 0], [0.05, -0.08], [0.044, -0.18], [0.032, -0.32], [0.026, -0.4], [0.027, -0.42], [0, -0.426]]), { scl: [1, 1, 1.05] }); ball(s, [0.075, 0.17, 0.08], [0, -0.11, -0.025]); }
+    else M(s, lathe('cshin', [[0, 0.01], [0.062, 0], [0.062, -0.1], [0.056, -0.33], [0.052, -0.42], [0, -0.426]]));
     const fw = 0.8 + 0.2 * W;
     s = bone('foot' + x, 'shin' + x, 0, -0.42 * k, 0, [k * fw, k, k]);
-    if (R) { ball(s, [0.056, 0.06, 0.06], [0, -0.01, 0]); ball(s, [0.085, 0.06, 0.23], [0, -0.042, 0.06]); ball(s, [0.062, 0.056, 0.07], [0, -0.044, -0.025]); ball(s, [0.082, 0.036, 0.06], [0, -0.054, 0.158]); }
-    else {
-      P(s, { shape: 'sphere', size: [0.066, 0.066, 0.066] }, true);
-      P(s, { shape: 'box', size: [0.085, 0.06, 0.19], pos: [0, -0.04, 0.05] });
-      P(s, { shape: 'box', size: [0.08, 0.035, 0.05], pos: [0, -0.0525, 0.165] });
-    }
+    TAG = 'ankle'; ball(s, R ? [0.056, 0.06, 0.06] : [0.09, 0.08, 0.09], [0, -0.01, 0]);
+    TAG = 'foot';
+    if (R) { ball(s, [0.085, 0.06, 0.23], [0, -0.042, 0.06]); ball(s, [0.062, 0.056, 0.07], [0, -0.044, -0.025]); ball(s, [0.082, 0.036, 0.06], [0, -0.054, 0.158]); }
+    else ball(s, [0.105, 0.07, 0.24], [0, -0.035, 0.06]);
   }
+  dress();
   for (const p of (def.parts || [])) {
     const bn = BONES.includes(p.bone) ? p.bone : null;
     const m = makePart(p, { attach: true });
     if (bn) skins[bn].add(m); else fig.add(m);
+  }
+  // Clipping guard for AI-made gear (armor, jackets, gloves): if a bone carries a part about as wide as that
+  // body segment, tuck the body (and outfit) on that bone slightly inward so nothing pokes through the gear.
+  const REF_W = { hips: 0.32, spine: 0.25, chest: 0.3, neck: 0.1, upperarm_l: 0.09, upperarm_r: 0.09, forearm_l: 0.07, forearm_r: 0.07, hand_l: 0.08, hand_r: 0.08, thigh_l: 0.12, thigh_r: 0.12, shin_l: 0.09, shin_r: 0.09, foot_l: 0.09, foot_r: 0.09 };
+  for (const [bn, w] of Object.entries(REF_W)) {
+    const sk = skins[bn]; if (!sk) continue;
+    const gear = sk.children.some(m => m.isMesh && m.userData.attach && (m.userData.opacity ?? 1) > 0.9 && m.userData.size && Math.max(m.userData.size[0], m.userData.size[2]) >= 0.75 * w);
+    if (!gear) continue;
+    sk.traverse(m => { if (m.isMesh && (m.userData.body || m.userData.outfit) && !m.userData.feature) { const f = m.userData.body ? 0.86 : 0.92; m.scale.x *= f; m.scale.z *= f; } });
   }
   return { fig, bones, skins };
 }
@@ -802,7 +919,7 @@ function applyPose(o) {
 }
 function regroundChar(o) {
   o.fig.position.y = 0;
-  const box = localBox(o.fig, o.root, m => m.userData.body);
+  const box = localBox(o.fig, o.root, m => m.userData.body || m.userData.outfit);
   if (!box.isEmpty()) o.fig.position.y = -box.min.y + clamp(num(o.pose.lift), -2, 50);
 }
 function buildProp(def) {
@@ -948,7 +1065,17 @@ function renderInspector() {
     const b = { ...BODY_DEFAULT, ...(o.def.body || {}) };
     h += `<div class="sub">Body type</div><div class="grid-btns" style="grid-template-columns:repeat(4,1fr)">${Object.keys(BODY_PRESETS).map(p => `<button class="btn" data-body="${p}" style="font-size:11.5px">${p}</button>`).join('')}</div>`;
     h += `<div id="bodySliders">${BODY_SLIDERS.map(([k, l, a, z, s]) => sliderHTML(k, l, a, z, s, num(b[k], BODY_DEFAULT[k]))).join('')}</div>`;
-    h += `<div class="slider"><label>Skin / mannequin</label><input type="color" id="skinC" value="${normColor(b.skin)}" style="width:100%;height:24px;border:0;background:none"><span></span></div>`;
+    const L = resolveLook(o.def);
+    const sel_ = (k, label) => `<label class="lk">${label}<select data-look="${k}">${LOOK_OPTS[k].map(v => `<option value="${v}" ${L[k] === v ? 'selected' : ''}>${v[0].toUpperCase() + v.slice(1)}</option>`).join('')}</select></label>`;
+    const col = (k) => `<input type="color" data-look="${k}" value="${L[k]}" title="Color">`;
+    h += `<div class="sub">Look (clothes never clip through)</div><div class="looks">
+      <div class="lkrow">${sel_('hair', 'Hair')}${col('hairColor')}</div>
+      <div class="lkrow">${sel_('eyes', 'Eyes')}${L.eyes === 'visor' ? col('eyeColor') : ''}<label class="check"><input type="checkbox" data-look="brows" ${L.brows ? 'checked' : ''}> Brows</label></div>
+      <div class="lkrow">${sel_('mouth', 'Mouth')}</div>
+      <div class="lkrow">${sel_('shirt', 'Top')}${col('shirtColor')}</div>
+      <div class="lkrow">${sel_('pants', 'Bottom')}${col('pantsColor')}</div>
+      <div class="lkrow"><label class="check"><input type="checkbox" data-look="shoes" ${L.shoes ? 'checked' : ''}> Shoes</label>${col('shoeColor')}</div></div>`;
+    h += `<div class="slider"><label>Skin</label><input type="color" id="skinC" value="${normColor(b.skin)}" style="width:100%;height:24px;border:0;background:none"><span></span></div>`;
   } else {
     const yaw = new THREE.Euler().setFromQuaternion(o.root.quaternion, 'YXZ').y / D2R;
     h += sliderHTML('pscale', 'Scale', 0.1, 5, 0.01, o.root.scale.x, '×');
@@ -986,6 +1113,11 @@ $('#inspector').addEventListener('input', e => {
     else if (k === 'pyaw') { o.root.rotation.set(0, val * D2R, 0); }
     else if (BODY_SLIDERS.some(s => s[0] === k)) { o.def.body = { ...BODY_DEFAULT, ...(o.def.body || {}), [k]: val }; rebuild(o); }
     saveSoon();
+  } else if (t.dataset && t.dataset.look) {
+    const k = t.dataset.look, L = resolveLook(o.def);
+    L[k] = t.type === 'checkbox' ? t.checked : t.value;
+    o.def.look = L; rebuild(o); saveSoon();
+    if (t.tagName === 'SELECT' || t.type === 'checkbox') renderInspector();
   } else if (t.id === 'skinC') { o.def.body = { ...BODY_DEFAULT, ...(o.def.body || {}), skin: t.value }; rebuild(o); saveSoon(); }
 });
 $('#inspector').addEventListener('change', e => {
@@ -1287,8 +1419,11 @@ A) PROP: anything not humanoid: furniture, vehicles, buildings, rooms, weapons, 
 Real-world scale, resting on the ground (lowest point y=0), centered on x=0,z=0, front toward +Z.
 
 B) CHARACTER: any humanoid (person, superhero, knight, robot, alien, zombie, elf, etc.).
-{"kind":"character","name":"...","body":{...},"pose":{...},"parts":[...]}
-The app supplies a posable mannequin body. DO NOT model the body or limbs themselves. "parts" are only what is ON the body: hair, hats, helmets, masks, clothing, armor, capes, belts, boots, gloves, backpacks, held items, tails, wings, horns, robot plating. Every character part MUST have "bone" (in the compact format, put it in extras, e.g. {"bone":"head"}).
+{"kind":"character","name":"...","body":{...},"look":{...},"pose":{...},"parts":[...]}
+The app supplies the posable body AND a built-in outfit system whose clothes and hair fit the body exactly and never clip. Describe hair, face, shirt, pants or skirt and shoes in "look"; do NOT model them as parts:
+look: {"hair":"short|spiky|curly|afro|bun|ponytail|long|dreads|none", "hairColor":"#hex", "eyes":"ovals|dots|lines|glasses|sunglasses|visor", "eyeColor":"#hex (lens color for a visor)", "brows":true|false, "mouth":"line|smile|open", "shirt":"tee|long|tank|none", "shirtColor":"#hex", "pants":"long|shorts|skirt|dress|none", "pantsColor":"#hex", "shoes":true|false, "shoeColor":"#hex"}
+(For a dress use pants "dress" with shirt "none"; long sleeves = shirt "long"; "visor" is a wraparound band over the eyes.)
+Use "parts" ONLY for what the outfit system can't make: hats, helmets, masks, jackets, coats and vests worn over the shirt, capes, armor, belts, gloves, scarves, bags, weapons and held items, jewelry, tails, wings, horns, logos or patterns. Parts worn over the outfit must sit just outside it (a jacket on the chest is about 0.34 wide and 0.25 deep). Leave parts empty if the look covers everything. Every character part MUST have "bone" (in the compact format, put it in extras, e.g. {"bone":"head"}).
 body: {"height":meters, "heads":2.5-9 (head-heights tall: 7.5 normal adult, 8-8.5 heroic, 6.5-7 teen, 5-5.5 child, 3 chibi), "build":0.6-1.8 (1 average, 1.6+ hulking), "shoulders":0.7-1.5, "hips":0.7-1.4, "bust":0-1, "skin":"#hex"}
 
 BONES: each part's pos/rot/size are in that bone's local frame, authored for the REFERENCE body (1.8 m, 7.5 heads, average build) in rest pose (standing straight, arms hanging at the sides). The app rescales parts to the actual body.
@@ -1304,7 +1439,7 @@ BONES: each part's pos/rot/size are in that bone's local frame, authored for the
 - shin_l / shin_r: origin at the knee; extends along -Y for 0.42; about 0.08 thick.
 - foot_l / foot_r: origin at the ankle; sole at y=-0.07; toes reach z=+0.19, heel z=-0.05; about 0.09 wide.
 "_l" is the character's left (outward = +X). For "_r", outward = -X: mirror x positions and y/z rotations for symmetrical parts.
-Clothing tips: a sleeve = cylinder on upperarm/forearm slightly thicker than the limb, centered half-way down it; pant legs on thigh/shin likewise; shirts and jackets on chest (+ spine, + hips for long ones); skirts and coat tails on hips; a cape on chest at z=-0.12 hanging down; hair and hats on head; shoes on feet.
+Gear tips: a jacket or vest = parts on chest (+ spine, + hips for long coats) slightly larger than the shirt; a cape on chest at z=-0.13 hanging down; hats and helmets on head sitting on top of the hair; held items in hand_l/hand_r through the grip; belts on hips.
 
 POSE: degrees per joint; omit joints that stay at 0. Joints: hips (rotates the whole body), spine, chest, neck, head, upperarm_l/_r (shoulder), forearm_l/_r (elbow), hand_l/_r (wrist), thigh_l/_r (hip joint), shin_l/_r (knee), foot_l/_r (ankle).
  x: torso/neck/head: + bends forward. upperarm and thigh: + swings forward (90 = pointing straight ahead), - swings back. forearm: + bends the elbow (0-150). shin: + bends the knee (0-150). hand: + curls the wrist forward. foot: + points toes down.
@@ -1340,10 +1475,10 @@ function refBlock(nImg, notes, copyPose, mode) {
   for (const n of notes) s += `\n\nNOTES FROM THE FILE "${n.name}":\n${n.text}`;
   return s;
 }
-const STYLE_BLOCKY = `\n\nSTYLE: BLOCKY. A clean, simple blockout that reads well at a glance: favor boxes and simple shapes, 20-90 parts, still including the main interior pieces of enclosed things (seats, steering wheel, furniture).`;
-const STYLE_REAL = `\n\nSTYLE: REALISTIC. The user wants a lifelike, organic model that is easy to draw from, not a blocky blockout. Sculpt curves by layering several overlapping rounded primitives (spheres, capsules, tapered cylinders, tori, hemispheres); boxes get rounded edges automatically, so use them only where the real object is boxy. Get true proportions and silhouettes, include the small features an artist would draw (handles, seams, trims, buttons, laces, panel lines, rims), and use natural, realistic colors. Use 80-250 parts, and remember the interior. For CHARACTERS the app supplies a realistic sculpted body: clothing should hug it closely (just slightly larger than the body part it covers) with collars, cuffs, hems and a few folds; build hair from several overlapping masses that follow the head shape; shoes should be shaped, not boxes.`;
+const STYLE_CARTOON = `\n\nSTYLE: CARTOON. The user's own art style: clean, rounded, slightly simplified shapes with clear silhouettes, like a 2D cartoon drawn with bold outlines and soft shading, in simple bold colors. Characters have a big round head on a small body (the app handles proportions; pick a fitting "look"). Props: complete and recognizable, 20-90 parts, still including the main interior pieces of enclosed things (seats, steering wheel, furniture).`;
+const STYLE_REAL = `\n\nSTYLE: REALISTIC. The user wants a lifelike, organic model that is easy to draw from, not a blocky blockout. Sculpt curves by layering several overlapping rounded primitives (spheres, capsules, tapered cylinders, tori, hemispheres); boxes get rounded edges automatically, so use them only where the real object is boxy. Get true proportions and silhouettes, include the small features an artist would draw (handles, seams, trims, buttons, laces, panel lines, rims), and use natural, realistic colors. Use 80-250 parts, and remember the interior. For CHARACTERS the app supplies a realistic sculpted body and the outfit from "look"; add realistic gear as parts (jackets with collars and pockets, belts with buckles, boots, gloves, straps) sitting just outside the outfit.`;
 function buildPrompt(q, kind, base, x = {}) {
-  const rb = (x.poseOnly ? '' : (modelStyle === 'realistic' ? STYLE_REAL : STYLE_BLOCKY)) + refBlock(x.nImg || 0, x.notes || [], x.copyPose, x.poseOnly ? 'pose' : 'build');
+  const rb = (x.poseOnly ? '' : (modelStyle === 'realistic' ? STYLE_REAL : STYLE_CARTOON)) + refBlock(x.nImg || 0, x.notes || [], x.copyPose, x.poseOnly ? 'pose' : 'build');
   if (x.poseOnly) return `${SPEC}${rb}\n\nTASK: This is an existing CHARACTER (JSON below). Look at the human figure in the reference image and work out its pose, joint by joint, in this app's pose convention (hips/whole-body lean, spine, chest, neck, head, both shoulders, elbows, wrists, hips, knees, ankles, plus "lift" if they are airborne). ${SIDES} Body: ${JSON.stringify(base.body || {}, round3)}\nReturn ONLY {"pose":{...}}.`;
   if (base) return `${SPEC}${rb}\n\nCURRENT MODEL (JSON):\n${JSON.stringify(base, round3)}\n\nCHANGE REQUESTED: "${q}"${x.nImg ? ' Use the reference image(s) as visual guidance for the change.' : ''}\nReturn the COMPLETE updated model as JSON in the same format, keeping everything the change doesn't touch. JSON only.`;
   return `${SPEC}${rb}\n\nREQUEST: ${q ? `"${q}"` : '(no text: build what the reference shows)'}\n${kind !== 'auto' ? `Build it as a ${kind.toUpperCase()}.` : 'Decide whether it is a CHARACTER (humanoid) or a PROP.'}\nReturn the JSON only.`;
@@ -1407,6 +1542,7 @@ function normalize(def, kindPref) {
   });
   if (out.kind === 'character') {
     out.body = { ...BODY_DEFAULT, ...(def.body || {}) };
+    out.look = resolveLook({ look: def.look && typeof def.look === 'object' ? def.look : {} });
     out.pose = normPose(def.pose);
   } else if (!out.parts.length) throw new Error('no parts');
   return out;
@@ -1414,12 +1550,12 @@ function normalize(def, kindPref) {
 const countParts = t => (t.match(/\["(?:box|sphere|ellipsoid|hemisphere|cylinder|tube|cone|pyramid|capsule|torus|wedge|ramp)"|"shape"/g) || []).length;
 const wantDetailPass = () => { const c = $('#detailPass'); return !!(c && c.checked); };
 const DETAIL_FOCUS_PROP = 'the interior and every small detail that is still missing';
-const DETAIL_FOCUS_CHAR = 'clothing detail (seams, collars, cuffs, hems, buttons, zips, pockets, belts and buckles, a few folds), accessories and gear, layered hair masses, eyebrows, and shaped shoes';
+const DETAIL_FOCUS_CHAR = 'gear and accessories worn over the outfit (jacket or vest details, collars, pockets, belts and buckles, straps, gloves, jewelry, logos, weapons and held items); the outfit itself comes from "look", so do not add shirts, pants, shoes or hair';
 // A second AI pass that adds interior and fine detail to a model; returns the merged model.
 async function detailPass(def, focus, { signal, quality, images = [], onText } = {}) {
   const isChar = def.kind === 'character';
   const list = (def.parts || []).map(toCompact);
-  const style = modelStyle === 'realistic' ? STYLE_REAL : STYLE_BLOCKY;
+  const style = modelStyle === 'realistic' ? STYLE_REAL : STYLE_CARTOON;
   const prompt = `${SPEC}${style}${images.length ? `\n\n${images.length} reference image${images.length > 1 ? 's are' : ' is'} attached: match its details.` : ''}
 
 CURRENT MODEL: kind "${def.kind}", name "${def.name}"${isChar ? `, body ${JSON.stringify(def.body || {}, round3)}` : ''}.
@@ -1549,7 +1685,14 @@ function libraryLookup(q, kindPref) {
     if (/giant|brute|ogre|orc|hulk/.test(s)) Object.assign(body, BODY_PRESETS.Brute);
     if (/dwarf/.test(s)) Object.assign(body, { height: 1.3, heads: 5, build: 1.4 });
     if (/old|elder/.test(s)) { pose.spine = { x: 12 }; pose.neck = { x: 10 }; pose.head = { x: -12 }; pose.shin_l = { x: 8 }; pose.shin_r = { x: 8 }; }
-    return { kind: 'character', name: q.replace(/\b\w/g, c => c.toUpperCase()).slice(0, 40), body, pose, parts: [] };
+    const look = { ...LOOK_DEFAULT };
+    if (body.bust) Object.assign(look, { hair: 'long', shirt: 'tank', shirtColor: '#a63fd8', pants: 'skirt', pantsColor: '#a63fd8', mouth: 'smile' });
+    if (/ninja|assassin|thief/.test(s)) Object.assign(look, { shirt: 'long', shirtColor: '#1b1b1f', pants: 'long', pantsColor: '#1b1b1f', shoeColor: '#1b1b1f', eyes: 'visor', eyeColor: '#22e6ff' });
+    if (/detective|businessman|businesswoman|officer|cop|police/.test(s)) Object.assign(look, { shirt: 'long', shirtColor: '#2f3a4f', pants: 'long', pantsColor: '#2a2a30', shoeColor: '#2a1d14' });
+    if (/superhero|hero/.test(s)) Object.assign(look, { hair: 'spiky', shirt: 'long', shirtColor: '#d63a3a', pants: 'long', pantsColor: '#2348b8' });
+    if (/old|elder/.test(s)) Object.assign(look, { hair: 'curly', hairColor: '#e8e3d6', eyes: 'glasses' });
+    if (/kid|child|boy\b/.test(s)) Object.assign(look, { hair: 'spiky', mouth: 'open' });
+    return { kind: 'character', name: q.replace(/\b\w/g, c => c.toUpperCase()).slice(0, 40), body, look, pose, parts: [] };
   }
   let best = null, bestLen = 0;
   for (const e of LIB) for (const kw of e.k) if (s.includes(kw) && kw.length > bestLen) { best = e; bestLen = kw.length; }
@@ -1564,13 +1707,18 @@ $('#chips').addEventListener('click', e => { const c = e.target.closest('.chip')
 function segBind(id, cb) { $(id).addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; $(id).querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); cb && cb(b.dataset.v); }); }
 segBind('#kindSeg'); segBind('#qualSeg');
 function setModelStyle(v, quiet) {
-  modelStyle = v === 'realistic' ? 'realistic' : 'blocky';
+  const prev = modelStyle;
+  modelStyle = v === 'realistic' ? 'realistic' : 'cartoon';
   try { localStorage.setItem('pp3d.style', JSON.stringify(modelStyle)); } catch { }
   document.querySelectorAll('#styleSeg button').forEach(b => b.classList.toggle('on', b.dataset.v === modelStyle));
   if (quiet) return;
+  // cartoon looks best inked (toon shading + outlines), realistic in plain color: swap the render style along with it
+  const rs = $('#style').value;
+  if (modelStyle === 'cartoon' && rs === 'color') { $('#style').value = 'comic'; setStyle('comic'); }
+  if (modelStyle === 'realistic' && rs === 'comic' && prev !== modelStyle) { $('#style').value = 'color'; setStyle('color'); }
   for (const o of objects) if (o.def.kind !== 'mesh') rebuild(o);
   markHighlight(); renderInspector();
-  setStatus(modelStyle === 'realistic' ? 'Realistic style: smooth, sculpted figures and rounded props. New AI builds get more lifelike detail.' : 'Blocky style: simple mannequins and blockout shapes.');
+  setStatus(modelStyle === 'realistic' ? 'Realistic style: lifelike, sculpted figures and rounded props.' : 'Cartoon style: your drawing style, with big round heads, clean shapes and ink outlines.');
 }
 try { $('#detailPass').checked = localStorage.getItem('pp3d.detail') !== 'false'; } catch { $('#detailPass').checked = true; }
 $('#detailPass').addEventListener('change', e => { try { localStorage.setItem('pp3d.detail', String(e.target.checked)); } catch { } });
@@ -2833,7 +2981,7 @@ if (saved && saved.length) {
   for (const s of saved) { try { const o = addObject({ ...s.def, pose: s.pose, name: s.name }, { t: s.t, silent: true }); o.root.visible = s.vis !== false; o.libId = s.libId || null; o.savedSig = s.sig || null; } catch { } }
   renderList();
 }
-setStyle('color'); renderInspector(); renderList();
+{ const rs0 = modelStyle === 'cartoon' ? 'comic' : 'color'; $('#style').value = rs0; setStyle(rs0); } renderInspector(); renderList();
 setTimeout(() => viewPreset('threeq'), 50);
 loop();
 updateSceneTitle(); openHome();
