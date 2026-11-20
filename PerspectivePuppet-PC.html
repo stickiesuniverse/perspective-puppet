@@ -377,7 +377,7 @@ body.mobile.dragging #stage::after{font-size:16px}
       <div class="seg" id="modeSeg"><button data-v="pose" class="on" title="Q">Pose</button><button data-v="translate" title="W">Move</button><button data-v="rotate" title="E">Rotate</button><button data-v="scale" title="R">Scale</button></div>
       <span class="hud" id="hud"></span>
       <span class="grow"></span>
-      <span class="seg zoombtns"><button type="button" id="zoomIn" title="Zoom in (+ key). Scroll or pinch to zoom toward a spot; double-click to fly in on it.">＋</button><button type="button" id="zoomOut" title="Zoom out (− key)">－</button></span>
+      <span class="seg zoombtns"><button type="button" id="zoomIn" title="Zoom in (+ key). Scroll or pinch to zoom toward a spot; double-click or double-tap to glide in and orbit around it.">＋</button><button type="button" id="zoomOut" title="Zoom out (− key)">－</button></span>
       <button class="btn" id="snapBtn">📷 Snapshot PNG</button>
       <button class="btn" id="glbBtn">⬇ Export .glb</button>
     </div>
@@ -453,10 +453,13 @@ camera.position.set(2.4, 1.5, 3.4);
 const controls = new OrbitControls(camera, glc);
 controls.target.set(0, 0.9, 0); controls.enableDamping = true; controls.dampingFactor = 0.12;
 controls.maxPolarAngle = Math.PI * 0.985;
-// near-limitless zoom: from 50 km out to half a millimetre in, diving toward whatever the cursor points at
+// near-limitless zoom (50 km out to half a millimetre in). OrbitControls keeps rotate + pan; zooming is
+// done by our own code further down so it closes in on the spot under the cursor without ever passing
+// through it and without throwing the orbit point off into empty space.
 const ZOOM_MIN = 0.0005, ZOOM_MAX = 50000;
 controls.minDistance = ZOOM_MIN; controls.maxDistance = ZOOM_MAX;
-controls.zoomToCursor = true; controls.zoomSpeed = 1.4;
+controls.enableZoom = false; controls.zoomToCursor = false;
+controls.mouseButtons.MIDDLE = THREE.MOUSE.PAN;
 
 const hemi = new THREE.HemisphereLight(0xffffff, 0x8a8170, 0.95); scene.add(hemi);
 const key = new THREE.DirectionalLight(0xffffff, 2.3);
@@ -465,12 +468,15 @@ Object.assign(key.shadow.camera, { left: -9, right: 9, top: 9, bottom: -9, near:
 key.shadow.bias = -0.0004; key.shadow.normalBias = 0.02;
 scene.add(key, key.target);
 const noOutline = m => { m.userData.outlineParameters = { visible: false }; return m; };
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(40000, 40000), noOutline(new THREE.ShadowMaterial({ opacity: 0.22 })));
-ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
-const gridFar = new THREE.GridHelper(4000, 80, 0x000000, 0x000000);   // 50 m squares, for orientation when zoomed far out
-gridFar.material.transparent = true; gridFar.material.opacity = 0.07; noOutline(gridFar.material); scene.add(gridFar);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), noOutline(new THREE.ShadowMaterial({ opacity: 0.22, depthWrite: false })));
+ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; ground.renderOrder = -2; scene.add(ground);
 const grid = new THREE.GridHelper(60, 60, 0x000000, 0x000000);
-grid.material.transparent = true; grid.material.opacity = 0.13; noOutline(grid.material); scene.add(grid);
+grid.material.transparent = true; grid.material.opacity = 0.13; grid.material.depthWrite = false; grid.renderOrder = -1;
+noOutline(grid.material); scene.add(grid);
+const gridFar = new THREE.GridHelper(4000, 80, 0x000000, 0x000000);   // 50 m squares; only shown when zoomed far out
+gridFar.material.transparent = true; gridFar.material.opacity = 0; gridFar.material.depthWrite = false; gridFar.renderOrder = -1;
+gridFar.visible = false; noOutline(gridFar.material); scene.add(gridFar);
+const GROUND_PLANE = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 const world = new THREE.Group(); scene.add(world);
 
 const tc = new TransformControls(camera, glc);
@@ -1095,24 +1101,104 @@ tc.addEventListener('objectChange', () => {
 /* picking */
 const ray = new THREE.Raycaster(); let downAt = null;
 glc.addEventListener('pointerdown', e => { downAt = (tc.axis || tc.dragging) ? null : [e.clientX, e.clientY]; });
-glc.addEventListener('dblclick', e => {
+/* ---- zoom: wheel / trackpad / pinch / buttons close in on the spot under the pointer ----
+   Each step is a scaling of camera AND orbit point about that spot, so the view direction never changes,
+   the spot stays under the pointer, and the camera only ever gets closer to it, never through it. */
+function isShown(o) { for (; o; o = o.parent) if (!o.visible) return false; return true; }
+function setRay(cx, cy) {
   const r = glc.getBoundingClientRect();
-  ray.setFromCamera(new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1), camera);
-  const hit = ray.intersectObjects(world.children, true).find(h => h.object.isMesh && h.object.userData.styleable && h.object.visible);
-  let pt = hit ? hit.point : null;
-  if (!pt) { const g = new V(); if (ray.ray.intersectPlane(new THREE.Plane(new V(0, 1, 0), 0), g)) pt = g; }
-  if (!pt) return;
-  const dir = camera.position.clone().sub(controls.target).normalize();
-  const dist = clamp(camera.position.distanceTo(pt) * 0.35, ZOOM_MIN * 4, ZOOM_MAX);
-  tweenTo(pt.clone().addScaledVector(dir, dist), pt.clone(), 450);
-});
-let lastTap = 0;                             // double-tap on touch screens does the same
-glc.addEventListener('pointerup', e => {
+  ray.setFromCamera(new THREE.Vector2((cx - r.left) / r.width * 2 - 1, -(cy - r.top) / r.height * 2 + 1), camera);
+}
+function surfaceAt(cx, cy) {                 // first visible model surface under a screen point, else the ground, else null
+  setRay(cx, cy);
+  const hit = ray.intersectObjects(world.children, true).find(h => h.object.isMesh && h.object.userData.styleable && isShown(h.object));
+  if (hit) return hit.point.clone();
+  const g = new V(); return ray.ray.intersectPlane(GROUND_PLANE, g) ? g : null;
+}
+function zoomAnchor(cx, cy) {
+  const tDist = camera.position.distanceTo(controls.target);
+  const p = surfaceAt(cx, cy);               // (leaves `ray` set for this point)
+  if (p && camera.position.distanceTo(p) < tDist * 4) return p;
+  return ray.ray.at(tDist, new V());         // nothing close under the pointer: aim at orbit-point depth
+}
+function applyZoom(s, anchor) {              // s < 1 = closer
+  const d = camera.position.distanceTo(controls.target);
+  if (!(d > 0) || !isFinite(s)) return false;
+  s = clamp(d * s, ZOOM_MIN, ZOOM_MAX) / d;
+  if (Math.abs(s - 1) < 1e-9) return false;
+  const c = anchor ? anchor.clone() : controls.target.clone();
+  camera.position.sub(c).multiplyScalar(s).add(c);
+  if (anchor) controls.target.sub(c).multiplyScalar(s).add(c);
+  return true;
+}
+const zoomQ = { log: 0, anchor: null, t: 0, inward: true, x: -1e9, y: -1e9 };
+function queueZoom(cx, cy, f) {              // smoothed: the step is spread over the next few frames
+  const now = performance.now(), inward = f < 1;
+  if (inward !== zoomQ.inward) zoomQ.log = 0;
+  if (inward !== zoomQ.inward || now - zoomQ.t > 220 || Math.hypot(cx - zoomQ.x, cy - zoomQ.y) > 4) {
+    zoomQ.anchor = zoomAnchor(cx, cy); zoomQ.x = cx; zoomQ.y = cy;
+  }
+  zoomQ.t = now; zoomQ.inward = inward; zoomQ.log += Math.log(f); tween = null;
+}
+function stepZoom() {
+  if (!zoomQ.log) return;
+  if (Math.abs(zoomQ.log) < 1e-4 || tc.dragging) { zoomQ.log = 0; return; }
+  const step = zoomQ.log * 0.35; zoomQ.log -= step;
+  if (!applyZoom(Math.exp(step), zoomQ.anchor)) zoomQ.log = 0;   // reached a limit
+}
+glc.addEventListener('wheel', e => {
+  e.preventDefault();
+  if (tc.dragging) return;
+  let dy = e.deltaY * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 400 : 1);
+  if (e.ctrlKey) dy *= 4;                    // trackpad pinch arrives as ctrl + small wheel steps
+  queueZoom(e.clientX, e.clientY, Math.exp(clamp(dy, -250, 250) * 0.002));
+}, { passive: false });
+
+const touchPts = new Map(); let pinchD = 0, tapStart = null, lastTap = null, lastPtrType = 'mouse';
+const pinchDist = () => { const [a, b] = [...touchPts.values()]; return Math.hypot(a[0] - b[0], a[1] - b[1]); };
+glc.addEventListener('pointerdown', e => {
+  lastPtrType = e.pointerType;
   if (e.pointerType !== 'touch') return;
-  const now = performance.now();
-  if (now - lastTap < 300) glc.dispatchEvent(new MouseEvent('dblclick', { clientX: e.clientX, clientY: e.clientY }));
-  lastTap = now;
+  touchPts.set(e.pointerId, [e.clientX, e.clientY]);
+  if (touchPts.size === 2) pinchD = pinchDist();
+  tapStart = touchPts.size === 1 ? { x: e.clientX, y: e.clientY, t: performance.now() } : null;  // a 2nd finger cancels the tap
 });
+glc.addEventListener('pointermove', e => {
+  if (!touchPts.has(e.pointerId)) return;
+  touchPts.set(e.pointerId, [e.clientX, e.clientY]);
+  if (touchPts.size !== 2 || tc.dragging) return;
+  const d = pinchDist();
+  if (pinchD > 8 && d > 8) {
+    const [a, b] = [...touchPts.values()];
+    zoomQ.log = 0; tween = null;
+    applyZoom(pinchD / d, zoomAnchor((a[0] + b[0]) / 2, (a[1] + b[1]) / 2));
+  }
+  pinchD = d;
+});
+function touchEnd(e) {
+  if (!touchPts.has(e.pointerId)) return;
+  touchPts.delete(e.pointerId);
+  pinchD = touchPts.size === 2 ? pinchDist() : 0;
+  if (e.type !== 'pointerup' || touchPts.size || !tapStart) { tapStart = null; return; }
+  const now = performance.now();
+  const isTap = now - tapStart.t < 280 && Math.hypot(e.clientX - tapStart.x, e.clientY - tapStart.y) < 12;
+  tapStart = null;
+  if (!isTap) { lastTap = null; return; }
+  if (lastTap && now - lastTap.t < 330 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 40) { lastTap = null; flyTo(e.clientX, e.clientY); }
+  else lastTap = { x: e.clientX, y: e.clientY, t: now };
+}
+glc.addEventListener('pointerup', touchEnd);
+glc.addEventListener('pointercancel', touchEnd);
+glc.addEventListener('dblclick', e => { if (lastPtrType !== 'touch') flyTo(e.clientX, e.clientY); });
+function flyTo(cx, cy) {                     // double-click / double-tap: glide in on that spot and orbit around it
+  if (tc.dragging) return;
+  const pt = surfaceAt(cx, cy); if (!pt) return;
+  const d = camera.position.distanceTo(pt), tDist = camera.position.distanceTo(controls.target);
+  if (d > Math.max(tDist * 30, 60)) return;  // far off near the horizon: ignore rather than leap away
+  const dir = camera.position.clone().sub(controls.target).normalize();
+  zoomQ.log = 0;
+  tweenTo(pt.clone().addScaledVector(dir, clamp(d * 0.4, ZOOM_MIN * 4, ZOOM_MAX)), pt, 450);
+}
 glc.addEventListener('pointerup', e => {
   if (!downAt || e.button !== 0) return;
   if (Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 5) return;
@@ -3035,21 +3121,23 @@ new ResizeObserver(resize).observe(stage); resize();
 function renderScene() {
   if (style === 'comic' || style === 'ink') outline.render(scene, camera); else renderer.render(scene, camera);
 }
-function fitClipPlanes() {
+function fitClipPlanes() {                 // clip planes follow the zoom so close-ups and far views both stay intact
   const dist = camera.position.distanceTo(controls.target);
-  const near = clamp(dist * 0.004, 0.00002, 0.5), far = clamp(dist * 400, 200, 2e6);
-  if (Math.abs(near - camera.near) > camera.near * 0.15 || Math.abs(far - camera.far) > camera.far * 0.15) {
+  if (!(dist > 0)) return;
+  const near = clamp(dist * 0.002, 0.00001, 0.1), far = clamp(dist * 500, 300, 2e6);
+  if (Math.abs(near - camera.near) > camera.near * 0.3 || Math.abs(far - camera.far) > camera.far * 0.3) {
     camera.near = near; camera.far = far; camera.updateProjectionMatrix();
   }
+  const o = clamp((dist - 25) / 75, 0, 1) * 0.08;   // the 50 m grid fades in only when zoomed far out
+  gridFar.visible = o > 0.002; gridFar.material.opacity = o;
 }
-function zoomBy(f) {                       // f < 1 zooms in, > 1 out, around the orbit point
-  const off = camera.position.clone().sub(controls.target);
-  const len = clamp(off.length() * f, ZOOM_MIN, ZOOM_MAX);
-  tween = null; camera.position.copy(controls.target).add(off.setLength(len));
+function zoomBy(f) {                       // buttons / keys: zoom toward the centre of the view
+  const r = glc.getBoundingClientRect();
+  queueZoom(r.left + r.width / 2, r.top + r.height / 2, f);
 }
 function loop() {
   requestAnimationFrame(loop);
-  stepTween(); controls.update(); fitClipPlanes();
+  stepTween(); stepZoom(); controls.update(); fitClipPlanes();
   if (roll) camera.rotateZ(roll);
   renderScene(); drawOverlay();
   if (++frameN % 6 === 0) updateHud();
@@ -3100,8 +3188,8 @@ addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
   if (k === 'q') setMode('pose'); else if (k === 'w') setMode('translate'); else if (k === 'e') setMode('rotate'); else if (k === 'r') setMode('scale');
   else if (k === 'f') viewPreset('threeq');
-  else if (k === '+' || k === '=') zoomBy(0.6);
-  else if (k === '-' || k === '_') zoomBy(1 / 0.6);
+  else if ((k === '+' || k === '=') && !e.ctrlKey && !e.metaKey) zoomBy(0.6);
+  else if ((k === '-' || k === '_') && !e.ctrlKey && !e.metaKey) zoomBy(1 / 0.6);
   else if ((k === 'delete' || k === 'backspace') && sel) removeObject(sel);
   else if (k === 'escape') select(null);
 });
