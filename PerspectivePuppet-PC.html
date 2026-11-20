@@ -625,15 +625,45 @@ function buildCharacter(def) {
     ball(s, [0.031, 0.024, 0.026], [0, -0.04, 0.114]);            // nose tip
     caps(s, 0.015, 0.046, [0, -0.063, 0.098], [0, 0, 90], { joint: true }); // mouth line
   };
+  // Realistic hand. Frame: origin at the wrist, fingers point down (-Y), the hand's width runs along Z
+  // with the thumb toward +Z (front), and the palm faces the body: -X on the left hand, +X on the right.
+  // So "toward the palm" is -sd on X. A rotation about Z by -sd*a swings a downward finger toward the palm.
+  // Fingers are chains of joints: each segment hangs from the end of the one before, so nothing drifts apart.
+  const joint = (parent, pos, rotDeg) => {
+    const g = new THREE.Group(); g.position.set(...pos);
+    g.rotation.set(rotDeg[0] * D2R, rotDeg[1] * D2R, rotDeg[2] * D2R); parent.add(g); return g;
+  };
+  const phalanx = (parent, d, len, rotDeg) => {   // one finger bone: capsule from the joint down to the next joint
+    const g = joint(parent, [0, 0, 0], rotDeg);
+    caps(g, d, len, [0, -len / 2, 0]);
+    return joint(g, [0, -(len - d * 0.45), 0], [0, 0, 0]);   // next joint, slightly overlapped so it looks continuous
+  };
   const realHand = (s, sd) => {
-    rbox(s, [0.03, 0.088, 0.08], [0, -0.05, 0.004]);              // palm
-    const fz = [0.028, 0.009, -0.01, -0.028], l1 = [0.044, 0.048, 0.046, 0.037], l2 = [0.034, 0.038, 0.036, 0.028];
-    for (let i = 0; i < 4; i++) {
-      caps(s, 0.018, l1[i], [-sd * 0.002, -0.094 - l1[i] / 2, fz[i]], [0, 0, sd * 6]);
-      caps(s, 0.016, l2[i], [-sd * 0.008, -0.094 - l1[i] - l2[i] / 2 + 0.004, fz[i]], [0, 0, sd * 16]);
+    const P = -sd;                                                // sign of "toward the palm" on X
+    rbox(s, [0.03, 0.088, 0.082], [0, -0.05, 0.002]);             // palm block (metacarpals)
+    ball(s, [0.022, 0.056, 0.036], [P * 0.011, -0.036, 0.026]);   // thenar pad (base of the thumb, palm side)
+    ball(s, [0.02, 0.06, 0.03], [P * 0.01, -0.05, -0.027]);       // hypothenar pad (pinky side of the palm)
+    //            z position, knuckle y, total length, thickness, splay (deg about X), curl per joint (deg)
+    const F = [
+      { z: 0.0285, y: -0.093, len: 0.079, d: 0.0175, splay: -4, curl: [8, 12, 8] },    // index (next to the thumb)
+      { z: 0.0095, y: -0.095, len: 0.085, d: 0.018, splay: -1, curl: [10, 15, 10] },   // middle (longest)
+      { z: -0.0095, y: -0.093, len: 0.081, d: 0.017, splay: 2, curl: [13, 18, 12] },   // ring
+      { z: -0.0275, y: -0.088, len: 0.064, d: 0.0155, splay: 6, curl: [16, 22, 14] },  // pinky (knuckle sits higher)
+    ];
+    for (const f of F) {
+      ball(s, [0.016, 0.014, f.d * 1.05], [-P * 0.008, f.y + 0.004, f.z]);   // knuckle bump on the back of the hand
+      const base = joint(s, [0, f.y, f.z], [f.splay, 0, 0]);
+      let j = phalanx(base, f.d, f.len * 0.45, [0, 0, P * f.curl[0]]);       // proximal phalanx
+      j = phalanx(j, f.d * 0.92, f.len * 0.31, [0, 0, P * f.curl[1]]);       // middle phalanx
+      phalanx(j, f.d * 0.85, f.len * 0.27, [0, 0, P * f.curl[2]]);           // distal phalanx (fingertip)
     }
-    caps(s, 0.02, 0.05, [-sd * 0.014, -0.045, 0.043], [-32, 0, sd * 18]); // thumb
-    caps(s, 0.017, 0.032, [-sd * 0.02, -0.075, 0.056], [-48, 0, sd * 22]);
+    // Thumb: starts low on the front-palm corner of the hand, angles forward (+Z) and across toward the palm
+    // relaxed: it lies along the index finger, a little in front of it and turned slightly toward the palm,
+    // with the tip about level with the index finger's first joint
+    const tb = joint(s, [P * 0.006, -0.022, 0.033], [-15, 0, P * 8]);
+    let t = phalanx(tb, 0.024, 0.046, [0, 0, 0]);                // metacarpal (the fleshy base)
+    t = phalanx(t, 0.02, 0.036, [-4, 0, P * 6]);                 // proximal phalanx
+    phalanx(t, 0.0175, 0.029, [-2, 0, P * 8]);                   // distal phalanx (thumb tip)
   };
   let s;
   s = bone('hips', null, 0, 0.972 * k, 0, [k * b.hips * wm, k, k * W]);
@@ -823,7 +853,7 @@ function boneOf(node) { while (node) { if (node.userData && node.userData.bone) 
 function markHighlight() {
   world.traverse(m => { if (m.isMesh && m.userData.styleable) m.userData.hl = false; });
   if (sel && sel.kind === 'character' && selBone && sel.skins[selBone])
-    sel.skins[selBone].children.forEach(m => { if (m.isMesh) m.userData.hl = true; });
+    sel.skins[selBone].traverse(m => { if (m.isMesh && m.userData.styleable) m.userData.hl = true; });
   applyStyleTo(world);
 }
 function attachGizmo() {
