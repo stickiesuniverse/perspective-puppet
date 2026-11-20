@@ -590,6 +590,54 @@ function ellipse(ax, ay, plane, off = [0, 0, 0]) {
   const l = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), lineMat); l.userData.construction = true; return l;
 }
 
+// ---- grip solver: bends fingers and thumb so every joint rests on a held handle (axis along the hand's Z) ----
+// Plane coordinates: u = toward the palm, y = up; a finger heading (sin a, -cos a) has curl a toward the palm.
+const _gripCache = new Map();
+function wrapChain(start, segs, C, rr, ccw, lim) {
+  let p = start, prev = 0; const out = [];
+  for (let i = 0; i < segs.length; i++) {
+    const l = segs[i], dx = p[0] - C[0], dy = p[1] - C[1], dist = Math.hypot(dx, dy);
+    let q;
+    if (dist > rr + l) {             // out of reach: head along the tangent on the wrap side, never into the object
+      const cx = -dx / dist, cy = -dy / dist, phi = Math.asin(Math.min(1, rr / dist)) * (ccw ? -1 : 1);
+      q = [p[0] + (cx * Math.cos(phi) - cy * Math.sin(phi)) * l, p[1] + (cx * Math.sin(phi) + cy * Math.cos(phi)) * l];
+    } else if (dist < Math.abs(rr - l)) {
+      q = [p[0] + Math.sin(prev) * l, p[1] - Math.cos(prev) * l];
+    } else {                         // the next joint lands exactly on the surface: circle-circle intersection
+      const a = (l * l - rr * rr + dist * dist) / (2 * dist), h = Math.sqrt(Math.max(l * l - a * a, 0));
+      const ex = (C[0] - p[0]) / dist, ey = (C[1] - p[1]) / dist, mx = p[0] + a * ex, my = p[1] + a * ey;
+      const cands = [[mx - h * ey, my + h * ex], [mx + h * ey, my - h * ex]];
+      const cr = c => (p[0] - C[0]) * (c[1] - C[1]) - (p[1] - C[1]) * (c[0] - C[0]);
+      q = cands.find(c => (cr(c) > 0) === ccw) || cands[0];
+    }
+    let c = (Math.atan2(q[0] - p[0], -(q[1] - p[1])) - prev) / D2R;
+    c = clamp(c, lim[i][0], lim[i][1]); prev += c * D2R;
+    p = [p[0] + Math.sin(prev) * l, p[1] - Math.cos(prev) * l]; out.push(+c.toFixed(1));
+  }
+  return out;
+}
+const HAND_FINGERS = [
+  { z: 0.0285, y: -0.093, len: 0.079, d: 0.0175, splay: -4, curl: [8, 12, 8] },    // index (next to the thumb)
+  { z: 0.0095, y: -0.095, len: 0.085, d: 0.018, splay: -1, curl: [10, 15, 10] },   // middle (longest)
+  { z: -0.0095, y: -0.093, len: 0.081, d: 0.017, splay: 2, curl: [13, 18, 12] },   // ring
+  { z: -0.0275, y: -0.088, len: 0.064, d: 0.0155, splay: 6, curl: [16, 22, 14] },  // pinky (knuckle sits higher)
+];
+function gripCurls(d, chunk = 1, cy = -0.085) {
+  const deff = Math.max(d, 0.022);    // thinner than this (a pencil, a fist): the fingers close around it
+  const key = [deff, chunk, cy].map(v => v.toFixed(4)).join('|');
+  if (_gripCache.has(key)) return _gripCache.get(key);
+  const C = [0.015 * chunk + deff / 2, cy];
+  const f = HAND_FINGERS.map(F => {
+    const fd = F.d * chunk;
+    const segs = [F.len * 0.45 - fd * 0.45, F.len * 0.31 - fd * 0.92 * 0.45, F.len * 0.27 - fd * 0.85 * 0.5];
+    return wrapChain([0, F.y], segs, C, deff / 2 + fd * 0.5, true, [[-10, 95], [0, 110], [0, 85]]);
+  });
+  // the thumb comes down from above, over the top of the handle and around the far side to meet the fingers
+  const t = wrapChain([0.006, -0.022], [0.046 - 0.024 * 0.45, 0.036 - 0.02 * 0.45, 0.029 - 0.0175 * 0.5], C, deff / 2 + 0.0105 * chunk, false, [[-40, 100], [-90, 40], [-80, 30]]);
+  const r = { f, t, C, deff }; _gripCache.set(key, r); return r;
+}
+const HAND_MODES = ['auto', 'relaxed', 'fist', 'point', 'open'];
+
 const LOOK_DEFAULT = { hair: 'short', hairColor: '#1d1d1f', eyes: 'ovals', eyeColor: '#22e6ff', brows: true, mouth: 'line', shirt: 'tee', shirtColor: '#3d9be0', pants: 'long', pantsColor: '#e4e4e4', shoes: true, shoeColor: '#f4f4f4' };
 // characters made before outfits existed carried their hair and clothes as parts: give those a bare look
 const LOOK_LEGACY = { ...LOOK_DEFAULT, hair: 'none', shirt: 'none', pants: 'none', shoes: false };
@@ -647,30 +695,31 @@ function buildCharacter(def) {
     caps(g, d, len, [0, -len / 2, 0]);
     return joint(g, [0, -(len - d * 0.45), 0], [0, 0, 0]);
   };
-  const realHand = (s, sd, chunk = 1) => {
+  const realHand = (s, sd, chunk = 1, mode = 'relaxed', held = null) => {
     const P = -sd;
     rbox(s, [0.03 * chunk, 0.088, 0.082], [0, -0.05, 0.002]);
     ball(s, [0.022, 0.056, 0.036], [P * 0.011, -0.036, 0.026]);
     ball(s, [0.02, 0.06, 0.03], [P * 0.01, -0.05, -0.027]);
-    const F = [
-      { z: 0.0285, y: -0.093, len: 0.079, d: 0.0175, splay: -4, curl: [8, 12, 8] },    // index
-      { z: 0.0095, y: -0.095, len: 0.085, d: 0.018, splay: -1, curl: [10, 15, 10] },   // middle
-      { z: -0.0095, y: -0.093, len: 0.081, d: 0.017, splay: 2, curl: [13, 18, 12] },   // ring
-      { z: -0.0275, y: -0.088, len: 0.064, d: 0.0155, splay: 6, curl: [16, 22, 14] },  // pinky
-    ];
-    for (const f of F) {
+    // grip: wrap the held handle exactly; fist and point close around nothing; open spreads flat
+    const G = (mode === 'grip' || mode === 'fist' || mode === 'point') ? gripCurls(mode === 'grip' && held ? held.d : 0.012, chunk, mode === 'grip' && held ? held.cy : -0.085) : null;
+    HAND_FINGERS.forEach((f, i) => {
       if (R) ball(s, [0.016, 0.014, f.d * 1.05], [-P * 0.008, f.y + 0.004, f.z]);
-      const base = joint(s, [0, f.y, f.z], [f.splay, 0, 0]);
+      const curl = (mode === 'point' && i === 0) ? [3, 4, 2] : G ? G.f[i] : mode === 'open' ? [3, 4, 3] : f.curl;
+      const base = joint(s, [0, f.y, f.z], [G ? f.splay * 0.3 : mode === 'open' ? f.splay * 2 : f.splay, 0, 0]);
       const d = f.d * chunk;
-      let j = phalanx(base, d, f.len * 0.45, [0, 0, P * f.curl[0]]);
-      j = phalanx(j, d * 0.92, f.len * 0.31, [0, 0, P * f.curl[1]]);
-      phalanx(j, d * 0.85, f.len * 0.27, [0, 0, P * f.curl[2]]);
-    }
-    const tb = joint(s, [P * 0.006, -0.022, 0.033], [-15, 0, P * 8]);
+      let j = phalanx(base, d, f.len * 0.45, [0, 0, P * curl[0]]);
+      j = phalanx(j, d * 0.92, f.len * 0.31, [0, 0, P * curl[1]]);
+      phalanx(j, d * 0.85, f.len * 0.27, [0, 0, P * curl[2]]);
+    });
+    const tr = G ? [[-3, 0, P * G.t[0]], [0, 0, P * G.t[1]], [0, 0, P * G.t[2]]]
+      : mode === 'open' ? [[-10, 0, P * -8], [0, 0, P * -4], [0, 0, 0]]
+      : [[-15, 0, P * 8], [-4, 0, P * 6], [-2, 0, P * 8]];
+    const tb = joint(s, [P * 0.006, -0.022, 0.033], tr[0]);
     let t = phalanx(tb, 0.024 * chunk, 0.046, [0, 0, 0]);
-    t = phalanx(t, 0.02 * chunk, 0.036, [-4, 0, P * 6]);
-    phalanx(t, 0.0175 * chunk, 0.029, [-2, 0, P * 8]);
+    t = phalanx(t, 0.02 * chunk, 0.036, tr[1]);
+    phalanx(t, 0.0175 * chunk, 0.029, tr[2]);
   };
+
   // ---- faces ----
   const INK = '#141414';
   const realHead = s => {
@@ -791,6 +840,32 @@ function buildCharacter(def) {
       M(skins.hips, lathe('skirt' + L, [[0, 0.06], [0.175, 0.05], [0.2, -L * 0.45], [0.245, -L], [0, -L + 0.004]]), { scl: [1, 1, 0.82], color: normColor(look.pantsColor, '#888'), kind: 'outfit' });
     }
   };
+  // ---- what is each hand holding? measure the handle, snap the item into the palm, choose the finger mode ----
+  const grips = {}, chunkH = R ? 1 : 1.18;
+  for (const sd of [1, -1]) {
+    const bn = sd > 0 ? 'hand_l' : 'hand_r', P = -sd;
+    const items = (def.parts || []).filter(p => p.bone === bn);
+    let held = null;
+    if (items.length) {
+      let best = null;
+      for (const p of items) {
+        const m = makePart(p); m.updateMatrixWorld(true);
+        const bb = new THREE.Box3().setFromObject(m), ext = bb.getSize(new V()), c = bb.getCenter(new V());
+        const gx = P * 0.03, gy = -0.085;            // where a handle should sit, near the palm
+        const dx = Math.max(bb.min.x - gx, 0, gx - bb.max.x), dy = Math.max(bb.min.y - gy, 0, gy - bb.max.y);
+        if (Math.hypot(dx, dy) > 0.06) continue;      // too far from the palm to be held
+        const thick = ext.x;                          // the size the fingers wrap around (palm-to-fingertip direction)
+        if (!best || thick < best.thick) best = { thick, c };
+      }
+      if (best) {
+        const d = clamp(best.thick, 0.006, 0.08), cy = clamp(best.c.y, -0.11, -0.07);
+        const g = gripCurls(d, chunkH, cy);
+        held = { d, cy, shift: [P * g.C[0] - best.c.x, cy - best.c.y] };   // move the item so its handle sits in the grip
+      }
+    }
+    const want = (def.hands && def.hands[bn]) || 'auto';
+    grips[bn] = { held, mode: want === 'auto' ? (held ? 'grip' : 'relaxed') : want };
+  }
   // ---- the bodies ----
   let s;
   s = bone('hips', null, 0, 0.972 * k, 0, [k * b.hips * wm, k, k * W]);
@@ -829,31 +904,31 @@ function buildCharacter(def) {
   hg.visible = $('#headT').checked; s.add(hg);
   for (const sd of [1, -1]) {
     const x = sd > 0 ? '_l' : '_r';
-    s = bone('upperarm' + x, 'chest', sd * 0.165 * k * b.shoulders * wm, 0.2 * k, -0.006 * k, [k * W, k, k * W]);
+    s = bone('upperarm' + x, 'chest', sd * 0.165 * k * b.shoulders * wm, 0.225 * k, -0.006 * k, [k * W, k, k * W]);
     TAG = 'shoulder';
     if (R) ball(s, [0.112, 0.135, 0.112], [sd * 0.012, -0.03, 0]); else ball(s, [0.104, 0.104, 0.104], [0, -0.004, 0]);
     TAG = 'uarm';
-    if (R) { M(s, lathe('uarm', [[0, 0.01], [0.045, -0.02], [0.048, -0.08], [0.05, -0.14], [0.043, -0.24], [0.036, -0.33], [0, -0.345]]), { scl: [1, 1, 1.05] }); ball(s, [0.07, 0.12, 0.075], [0, -0.15, 0.012]); }
-    else M(s, lathe('cuarm', [[0, 0.01], [0.05, -0.01], [0.051, -0.17], [0.046, -0.33], [0, -0.345]]));
-    s = bone('forearm' + x, 'upperarm' + x, 0, -0.336 * k, 0, [k * W, k, k * W]);
+    if (R) { M(s, lathe('uarm', [[0, 0.01], [0.045, -0.02], [0.048, -0.08], [0.05, -0.14], [0.043, -0.24], [0.036, -0.33], [0, -0.345]]), { scl: [1, 0.893, 1.05] }); ball(s, [0.07, 0.107, 0.075], [0, -0.134, 0.012]); }
+    else M(s, lathe('cuarm', [[0, 0.01], [0.05, -0.01], [0.051, -0.17], [0.046, -0.33], [0, -0.345]]), { scl: [1, 0.893, 1] });
+    s = bone('forearm' + x, 'upperarm' + x, 0, -0.30 * k, 0, [k * W, k, k * W]);
     TAG = 'elbow'; ball(s, R ? [0.07, 0.07, 0.07] : [0.092, 0.092, 0.092], [0, 0, -0.004]);
     TAG = 'farm';
-    if (R) M(s, lathe('farm', [[0, 0.012], [0.036, 0], [0.043, -0.06], [0.036, -0.15], [0.027, -0.25], [0.024, -0.276], [0, -0.282]]), { scl: [0.88, 1, 1.05] });
-    else M(s, lathe('cfarm', [[0, 0.01], [0.046, 0], [0.045, -0.14], [0.039, -0.27], [0, -0.282]]), { scl: [0.95, 1, 1] });
+    if (R) M(s, lathe('farm', [[0, 0.012], [0.036, 0], [0.043, -0.06], [0.036, -0.15], [0.027, -0.25], [0.024, -0.276], [0, -0.282]]), { scl: [0.88, 0.906, 1.05] });
+    else M(s, lathe('cfarm', [[0, 0.01], [0.046, 0], [0.045, -0.14], [0.039, -0.27], [0, -0.282]]), { scl: [0.95, 0.906, 1] });
     const hw = 0.75 + 0.25 * W;
-    s = bone('hand' + x, 'forearm' + x, 0, -0.276 * k, 0, [k * hw, k, k * hw]);
-    TAG = 'hand'; realHand(s, sd, R ? 1 : 1.18);
+    s = bone('hand' + x, 'forearm' + x, 0, -0.25 * k, 0, [k * hw, k, k * hw]);
+    TAG = 'hand'; { const g = grips['hand' + x]; realHand(s, sd, chunkH, g.mode, g.held); }
     s = bone('thigh' + x, 'hips', sd * 0.096 * k * b.hips * wm, -0.036 * k, 0, [k * W, k, k * W]);
     TAG = 'thigh';
-    if (R) { M(s, lathe('thigh', [[0, 0.03], [0.075, 0], [0.08, -0.06], [0.075, -0.15], [0.065, -0.28], [0.05, -0.4], [0.045, -0.444], [0, -0.452]]), { pos: [0, 0, 0.005], scl: [0.95, 1, 1.05] }); ball(s, [0.1, 0.22, 0.08], [sd * 0.005, -0.2, 0.035]); }
-    else M(s, lathe('cthigh', [[0, 0.03], [0.076, 0.01], [0.076, -0.1], [0.07, -0.3], [0.062, -0.444], [0, -0.452]]));
-    s = bone('shin' + x, 'thigh' + x, 0, -0.444 * k, 0, [k * W, k, k * W]);
+    if (R) { M(s, lathe('thigh', [[0, 0.03], [0.075, 0], [0.08, -0.06], [0.075, -0.15], [0.065, -0.28], [0.05, -0.4], [0.045, -0.444], [0, -0.452]]), { pos: [0, 0, 0.005], scl: [0.95, 1.036, 1.05] }); ball(s, [0.1, 0.228, 0.08], [sd * 0.005, -0.207, 0.035]); }
+    else M(s, lathe('cthigh', [[0, 0.03], [0.076, 0.01], [0.076, -0.1], [0.07, -0.3], [0.062, -0.444], [0, -0.452]]), { scl: [1, 1.036, 1] });
+    s = bone('shin' + x, 'thigh' + x, 0, -0.46 * k, 0, [k * W, k, k * W]);
     TAG = 'knee'; if (R) ball(s, [0.05, 0.056, 0.04], [0, 0.005, 0.04]); else ball(s, [0.124, 0.124, 0.124], [0, 0, 0]);
     TAG = 'shin';
-    if (R) { M(s, lathe('shin', [[0, 0.025], [0.046, 0], [0.05, -0.08], [0.044, -0.18], [0.032, -0.32], [0.026, -0.4], [0.027, -0.42], [0, -0.426]]), { scl: [1, 1, 1.05] }); ball(s, [0.075, 0.17, 0.08], [0, -0.11, -0.025]); }
-    else M(s, lathe('cshin', [[0, 0.01], [0.062, 0], [0.062, -0.1], [0.056, -0.33], [0.052, -0.42], [0, -0.426]]));
+    if (R) { M(s, lathe('shin', [[0, 0.025], [0.046, 0], [0.05, -0.08], [0.044, -0.18], [0.032, -0.32], [0.026, -0.4], [0.027, -0.42], [0, -0.426]]), { scl: [1, 0.962, 1.05] }); ball(s, [0.075, 0.164, 0.08], [0, -0.106, -0.025]); }
+    else M(s, lathe('cshin', [[0, 0.01], [0.062, 0], [0.062, -0.1], [0.056, -0.33], [0.052, -0.42], [0, -0.426]]), { scl: [1, 0.962, 1] });
     const fw = 0.8 + 0.2 * W;
-    s = bone('foot' + x, 'shin' + x, 0, -0.42 * k, 0, [k * fw, k, k]);
+    s = bone('foot' + x, 'shin' + x, 0, -0.404 * k, 0, [k * fw, k, k]);
     TAG = 'ankle'; ball(s, R ? [0.056, 0.06, 0.06] : [0.09, 0.08, 0.09], [0, -0.01, 0]);
     TAG = 'foot';
     if (R) { ball(s, [0.085, 0.06, 0.23], [0, -0.042, 0.06]); ball(s, [0.062, 0.056, 0.07], [0, -0.044, -0.025]); ball(s, [0.082, 0.036, 0.06], [0, -0.054, 0.158]); }
@@ -863,11 +938,13 @@ function buildCharacter(def) {
   for (const p of (def.parts || [])) {
     const bn = BONES.includes(p.bone) ? p.bone : null;
     const m = makePart(p, { attach: true });
+    const hg = (bn === 'hand_l' || bn === 'hand_r') && grips[bn] && grips[bn].held && grips[bn].mode === 'grip' ? grips[bn].held : null;
+    if (hg) { m.position.x += hg.shift[0]; m.position.y += hg.shift[1]; }
     if (bn) skins[bn].add(m); else fig.add(m);
   }
   // Clipping guard for AI-made gear (armor, jackets, gloves): if a bone carries a part about as wide as that
   // body segment, tuck the body (and outfit) on that bone slightly inward so nothing pokes through the gear.
-  const REF_W = { hips: 0.32, spine: 0.25, chest: 0.3, neck: 0.1, upperarm_l: 0.09, upperarm_r: 0.09, forearm_l: 0.07, forearm_r: 0.07, hand_l: 0.08, hand_r: 0.08, thigh_l: 0.12, thigh_r: 0.12, shin_l: 0.09, shin_r: 0.09, foot_l: 0.09, foot_r: 0.09 };
+  const REF_W = { hips: 0.32, spine: 0.25, chest: 0.3, neck: 0.1, upperarm_l: 0.09, upperarm_r: 0.09, forearm_l: 0.07, forearm_r: 0.07, thigh_l: 0.12, thigh_r: 0.12, shin_l: 0.09, shin_r: 0.09, foot_l: 0.09, foot_r: 0.09 };
   for (const [bn, w] of Object.entries(REF_W)) {
     const sk = skins[bn]; if (!sk) continue;
     const gear = sk.children.some(m => m.isMesh && m.userData.attach && (m.userData.opacity ?? 1) > 0.9 && m.userData.size && Math.max(m.userData.size[0], m.userData.size[2]) >= 0.75 * w);
@@ -1097,7 +1174,11 @@ function syncJointSliders(rebuildHtml = false) {
   const v = sel.pose[selBone] || {};
   if (rebuildHtml || !box.dataset.bone || box.dataset.bone !== selBone) {
     box.dataset.bone = selBone;
-    box.innerHTML = axesFor(selBone).map(([ax, l]) => sliderHTML('j_' + ax, l, -180, 180, 1, Math.round(num(v[ax])), '°')).join('') + `<button class="btn" data-act="resetjoint" style="font-size:12px;padding:4px 8px">Reset joint</button>`;
+    const hm = selBone.startsWith('hand') ? (((sel.def.hands || {})[selBone]) || 'auto') : null;
+    const HL = { auto: 'Auto (grip what it holds)', relaxed: 'Relaxed', fist: 'Fist', point: 'Point', open: 'Open / flat' };
+    box.innerHTML = axesFor(selBone).map(([ax, l]) => sliderHTML('j_' + ax, l, -180, 180, 1, Math.round(num(v[ax])), '°')).join('')
+      + (hm ? `<label class="lk" style="margin:6px 0">Fingers<select id="handMode">${HAND_MODES.map(m => `<option value="${m}" ${m === hm ? 'selected' : ''}>${HL[m]}</option>`).join('')}</select></label>` : '')
+      + `<button class="btn" data-act="resetjoint" style="font-size:12px;padding:4px 8px">Reset joint</button>`;
   } else {
     box.querySelectorAll('input[type=range]').forEach(i => { const ax = i.dataset.k.slice(2); i.value = Math.round(num(v[ax])); i.nextElementSibling.textContent = Math.round(num(v[ax])) + '°'; });
   }
@@ -1121,6 +1202,7 @@ $('#inspector').addEventListener('input', e => {
   } else if (t.id === 'skinC') { o.def.body = { ...BODY_DEFAULT, ...(o.def.body || {}), skin: t.value }; rebuild(o); saveSoon(); }
 });
 $('#inspector').addEventListener('change', e => {
+  if (e.target.id === 'handMode' && sel && selBone) { sel.def.hands = { ...(sel.def.hands || {}), [selBone]: e.target.value }; rebuild(sel); syncJointSliders(true); save(); return; }
   if (e.target.id === 'jointSel' && sel) { select(sel, e.target.value || null); if (mode !== 'pose') setMode('pose'); }
 });
 $('#inspector').addEventListener('click', async e => {
@@ -1429,14 +1511,14 @@ body: {"height":meters, "heads":2.5-9 (head-heights tall: 7.5 normal adult, 8-8.
 BONES: each part's pos/rot/size are in that bone's local frame, authored for the REFERENCE body (1.8 m, 7.5 heads, average build) in rest pose (standing straight, arms hanging at the sides). The app rescales parts to the actual body.
 - hips: origin = pelvis center, 0.97 m above ground. Pelvis about 0.33 wide, 0.2 deep. Belt line y=+0.04. Crotch y=-0.09.
 - spine: origin 0.08 above pelvis center (abdomen; waist about 0.26 wide, 0.17 deep, spans y 0 to +0.15).
-- chest: origin 0.25 above pelvis center. Ribcage center y=+0.11 (0.31 wide, 0.21 deep: front surface z=+0.105, back z=-0.105). Shoulder line y=+0.20, shoulder joints at x=+-0.165. Collar / base of neck y=+0.24.
+- chest: origin 0.25 above pelvis center. Ribcage center y=+0.11 (0.31 wide, 0.21 deep: front surface z=+0.105, back z=-0.105). Shoulder line y=+0.225, shoulder joints at x=+-0.165. Collar / base of neck y=+0.24.
 - neck: origin at the base of the neck; the head joint is 0.08 above it.
 - head: origin = CENTER of the head. Head 0.24 tall (crown y=+0.12, chin y=-0.12), 0.19 wide (ears at x=+-0.095), 0.22 deep (nose tip z=+0.12, back of skull z=-0.11). Eyes y=0, mouth y=-0.06.
-- upperarm_l / upperarm_r: origin at the shoulder joint; the upper arm hangs along -Y for 0.34; about 0.09 thick.
-- forearm_l / forearm_r: origin at the elbow; extends along -Y for 0.28; about 0.065 thick.
-- hand_l / hand_r: origin at the wrist; the hand extends along -Y for 0.17, palm facing the body. Fist/grip center at [0,-0.08,0.01]. A held object's handle passes through the grip along local Z (e.g. a sword: handle along Z, blade pointing +Z).
-- thigh_l / thigh_r: origin at the hip joint; extends along -Y for 0.44; about 0.12 thick.
-- shin_l / shin_r: origin at the knee; extends along -Y for 0.42; about 0.08 thick.
+- upperarm_l / upperarm_r: origin at the shoulder joint; the upper arm hangs along -Y for 0.30; about 0.09 thick.
+- forearm_l / forearm_r: origin at the elbow; extends along -Y for 0.25; about 0.065 thick.
+- hand_l / hand_r: origin at the wrist; the hand extends along -Y for 0.17, palm facing the body (-X on hand_l, +X on hand_r), thumb toward +Z. HOLDING THINGS: run the handle along local Z through the grip at y=-0.085, pressed against the palm: center x = -(0.015 + handle radius) on hand_l, +(0.015 + handle radius) on hand_r. The app wraps the fingers and thumb around whatever is there and snaps it into the palm, so give the handle its true thickness (sword grip ~0.03, bat ~0.04, pen ~0.01, cup body ~0.08). A sword: handle along Z, blade pointing +Z. Optional top-level "hands": {"hand_l":"auto|relaxed|fist|point|open","hand_r":...} (auto grips held items, otherwise relaxed).
+- thigh_l / thigh_r: origin at the hip joint; extends along -Y for 0.46; about 0.12 thick.
+- shin_l / shin_r: origin at the knee; extends along -Y for 0.40; about 0.08 thick.
 - foot_l / foot_r: origin at the ankle; sole at y=-0.07; toes reach z=+0.19, heel z=-0.05; about 0.09 wide.
 "_l" is the character's left (outward = +X). For "_r", outward = -X: mirror x positions and y/z rotations for symmetrical parts.
 Gear tips: a jacket or vest = parts on chest (+ spine, + hips for long coats) slightly larger than the shirt; a cape on chest at z=-0.13 hanging down; hats and helmets on head sitting on top of the hair; held items in hand_l/hand_r through the grip; belts on hips.
@@ -1543,6 +1625,7 @@ function normalize(def, kindPref) {
   if (out.kind === 'character') {
     out.body = { ...BODY_DEFAULT, ...(def.body || {}) };
     out.look = resolveLook({ look: def.look && typeof def.look === 'object' ? def.look : {} });
+    if (def.hands && typeof def.hands === 'object') { out.hands = {}; for (const h of ['hand_l', 'hand_r']) if (HAND_MODES.includes(def.hands[h])) out.hands[h] = def.hands[h]; }
     out.pose = normPose(def.pose);
   } else if (!out.parts.length) throw new Error('no parts');
   return out;
